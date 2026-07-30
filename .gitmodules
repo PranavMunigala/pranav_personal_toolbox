@@ -1,0 +1,6 @@
+[submodule "vendor/bme-research"]
+	path = vendor/bme-research
+	url = https://github.com/PranavMunigala/bme-research.git
+[submodule "vendor/athena"]
+	path = vendor/athena
+	url = https://github.com/PranavMunigala/Athena.V0.git
