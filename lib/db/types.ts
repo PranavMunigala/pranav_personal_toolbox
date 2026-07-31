@@ -7,6 +7,8 @@ export type ContactStatus =
   | "coffee_chatted"
   | "no_response";
 
+export type ConnectionStatus = "not_connected" | "pending" | "connected";
+
 export interface Contact {
   id: number;
   name: string;
@@ -23,6 +25,10 @@ export interface Contact {
   date_last_contacted: string | null;
   created_at: string;
   updated_at: string;
+  phone: string | null;
+  is_recruiter: number; // SQLite boolean: 0/1
+  connection_status: ConnectionStatus;
+  alma_mater: string | null;
 }
 
 export type ApplicationStatus =
@@ -65,4 +71,39 @@ export interface Preferences {
   seniority_focus: string; // JSON-encoded string[]
   notes: string | null;
   updated_at: string;
+}
+
+export type SuggestedContactStatus = "pending" | "added" | "dismissed";
+
+export interface SuggestedContact {
+  id: number;
+  name: string;
+  company: string | null;
+  title: string | null;
+  linkedin_url: string | null;
+  source_snippet: string | null;
+  match_reasons: string | null;
+  discovered_at: string; // DATE, groups a discovery run into a "batch"
+  status: SuggestedContactStatus;
+  promoted_contact_id: number | null;
+  created_at: string;
+}
+
+export type RequireConnection = "any" | "connected_only" | "not_connected_only";
+
+export interface DiscoveryPreferences {
+  id: 1;
+  target_schools: string; // JSON-encoded string[]
+  require_connection: RequireConnection;
+  exclude_recruiters: number; // 0/1
+  notes: string | null;
+  updated_at: string;
+}
+
+export interface Resume {
+  id: 1;
+  raw_text: string | null;
+  keywords: string; // JSON-encoded string[]
+  filename: string | null;
+  uploaded_at: string | null;
 }

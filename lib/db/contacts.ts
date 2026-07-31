@@ -1,5 +1,5 @@
 import { db } from "./index";
-import type { Contact, ContactStatus, SeniorityTier } from "./types";
+import type { Contact, ConnectionStatus, ContactStatus, SeniorityTier } from "./types";
 
 export interface NewContact {
   name: string;
@@ -13,10 +13,66 @@ export interface NewContact {
   profile_text?: string | null;
   notes?: string | null;
   date_last_contacted?: string | null;
+  phone?: string | null;
+  is_recruiter?: boolean;
+  connection_status?: ConnectionStatus;
+  alma_mater?: string | null;
 }
 
-export function listContacts(): Contact[] {
-  return db.prepare("SELECT * FROM contacts ORDER BY updated_at DESC").all() as Contact[];
+export interface ContactFilters {
+  status?: ContactStatus;
+  company?: string;
+  seniority_tier?: SeniorityTier;
+  connection_status?: ConnectionStatus;
+  is_recruiter?: boolean;
+  alma_mater?: string;
+  industry_tag?: string;
+  q?: string; // free-text substring over name/company/title
+}
+
+export function listContacts(filters?: ContactFilters): Contact[] {
+  const clauses: string[] = [];
+  const params: Record<string, unknown> = {};
+
+  if (filters?.status) {
+    clauses.push("status = @status");
+    params.status = filters.status;
+  }
+  if (filters?.company) {
+    clauses.push("company = @company COLLATE NOCASE");
+    params.company = filters.company;
+  }
+  if (filters?.seniority_tier) {
+    clauses.push("seniority_tier = @seniority_tier");
+    params.seniority_tier = filters.seniority_tier;
+  }
+  if (filters?.connection_status) {
+    clauses.push("connection_status = @connection_status");
+    params.connection_status = filters.connection_status;
+  }
+  if (filters?.is_recruiter !== undefined) {
+    clauses.push("is_recruiter = @is_recruiter");
+    params.is_recruiter = filters.is_recruiter ? 1 : 0;
+  }
+  if (filters?.alma_mater) {
+    clauses.push("alma_mater = @alma_mater COLLATE NOCASE");
+    params.alma_mater = filters.alma_mater;
+  }
+  if (filters?.industry_tag) {
+    clauses.push(
+      "EXISTS (SELECT 1 FROM json_each(contacts.industry_tags) WHERE json_each.value = @industry_tag COLLATE NOCASE)"
+    );
+    params.industry_tag = filters.industry_tag;
+  }
+  if (filters?.q) {
+    clauses.push("(name LIKE @q OR company LIKE @q OR title LIKE @q)");
+    params.q = `%${filters.q}%`;
+  }
+
+  const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
+  return db
+    .prepare(`SELECT * FROM contacts ${where} ORDER BY updated_at DESC`)
+    .all(params) as Contact[];
 }
 
 export function getContact(id: number): Contact | undefined {
@@ -39,8 +95,8 @@ export function insertContact(c: NewContact): Contact {
   const info = db
     .prepare(
       `INSERT INTO contacts
-        (name, linkedin_url, email, company, title, seniority_tier, industry_tags, status, profile_text, notes, date_last_contacted)
-       VALUES (@name, @linkedin_url, @email, @company, @title, @seniority_tier, @industry_tags, @status, @profile_text, @notes, @date_last_contacted)`
+        (name, linkedin_url, email, company, title, seniority_tier, industry_tags, status, profile_text, notes, date_last_contacted, phone, is_recruiter, connection_status, alma_mater)
+       VALUES (@name, @linkedin_url, @email, @company, @title, @seniority_tier, @industry_tags, @status, @profile_text, @notes, @date_last_contacted, @phone, @is_recruiter, @connection_status, @alma_mater)`
     )
     .run({
       name: c.name,
@@ -54,6 +110,10 @@ export function insertContact(c: NewContact): Contact {
       profile_text: c.profile_text ?? null,
       notes: c.notes ?? null,
       date_last_contacted: c.date_last_contacted ?? null,
+      phone: c.phone ?? null,
+      is_recruiter: c.is_recruiter ? 1 : 0,
+      connection_status: c.connection_status ?? "not_connected",
+      alma_mater: c.alma_mater ?? null,
     });
   return getContact(Number(info.lastInsertRowid))!;
 }
@@ -75,12 +135,18 @@ export function updateContact(id: number, patch: Partial<NewContact>): Contact {
     profile_text: patch.profile_text ?? existing.profile_text,
     notes: patch.notes ?? existing.notes,
     date_last_contacted: patch.date_last_contacted ?? existing.date_last_contacted,
+    phone: patch.phone ?? existing.phone,
+    is_recruiter:
+      patch.is_recruiter !== undefined ? (patch.is_recruiter ? 1 : 0) : existing.is_recruiter,
+    connection_status: patch.connection_status ?? existing.connection_status,
+    alma_mater: patch.alma_mater ?? existing.alma_mater,
   };
   db.prepare(
     `UPDATE contacts SET
       name=@name, linkedin_url=@linkedin_url, email=@email, company=@company, title=@title,
       seniority_tier=@seniority_tier, industry_tags=@industry_tags, status=@status,
       profile_text=@profile_text, notes=@notes, date_last_contacted=@date_last_contacted,
+      phone=@phone, is_recruiter=@is_recruiter, connection_status=@connection_status, alma_mater=@alma_mater,
       updated_at=datetime('now')
      WHERE id=@id`
   ).run({ ...merged, id });

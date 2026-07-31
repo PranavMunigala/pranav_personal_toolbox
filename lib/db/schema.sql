@@ -67,7 +67,44 @@ CREATE TABLE IF NOT EXISTS preferences (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Candidate contacts found by the contact-discovery skill, pending human review.
+-- Never a source of truth on its own: promoting one always goes through
+-- lib/db/contacts.ts::insertContact, same as any other new contact.
+CREATE TABLE IF NOT EXISTS suggested_contacts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  company TEXT,
+  title TEXT,
+  linkedin_url TEXT,
+  source_snippet TEXT,
+  match_reasons TEXT,
+  discovered_at TEXT NOT NULL DEFAULT (date('now')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'added', 'dismissed')),
+  promoted_contact_id INTEGER REFERENCES contacts(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS discovery_preferences (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  target_schools TEXT NOT NULL DEFAULT '[]', -- JSON array, e.g. ["Rutgers"]
+  require_connection TEXT NOT NULL DEFAULT 'any'
+    CHECK (require_connection IN ('any', 'connected_only', 'not_connected_only')),
+  exclude_recruiters INTEGER NOT NULL DEFAULT 0,
+  notes TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS resume (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  raw_text TEXT,
+  keywords TEXT NOT NULL DEFAULT '[]', -- JSON array, extracted locally (no LLM call)
+  filename TEXT,
+  uploaded_at TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
 CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company);
 CREATE INDEX IF NOT EXISTS idx_applications_company ON applications(company);
 CREATE INDEX IF NOT EXISTS idx_applications_status ON applications(status);
+CREATE INDEX IF NOT EXISTS idx_suggested_contacts_discovered_at ON suggested_contacts(discovered_at);
+CREATE INDEX IF NOT EXISTS idx_suggested_contacts_status ON suggested_contacts(status);

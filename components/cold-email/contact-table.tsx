@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   Table,
@@ -83,7 +84,9 @@ export function ContactTable({ contacts }: { contacts: Contact[] }) {
               <TableRow key={c.id}>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-1.5">
-                    {c.name}
+                    <Link href={`/cold-email/${c.id}`} className="hover:underline">
+                      {c.name}
+                    </Link>
                     {c.linkedin_url && (
                       <a
                         href={c.linkedin_url}

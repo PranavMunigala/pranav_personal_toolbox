@@ -21,7 +21,10 @@ localhost for one person.
 - **contacts** — `seniority_tier` (`peer`/`mid`/`senior`), `status`
   (`not_contacted`/`drafted`/`sent`/`coffee_chatted`/`no_response`), `industry_tags`
   (JSON array), `profile_text` (raw pasted LinkedIn About/Experience — the only source of
-  truth for facts used in drafts).
+  truth for facts used in drafts). Also `phone`, `is_recruiter`, `connection_status`
+  (`not_connected`/`pending`/`connected` — a separate axis from outreach `status`), and
+  `alma_mater`, added via a `PRAGMA table_info`-based migration guard in `lib/db/index.ts`
+  (SQLite has no `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
 - **email_drafts** — history of generated drafts per contact.
 - **applications** — `status` (`applied`/`oa`/`interview`/`follow_up`/`offer`/`rejected`).
 - **application_contacts** — many-to-many join between applications and contacts.
@@ -29,13 +32,23 @@ localhost for one person.
   (`under_30`/`30_45`/`45_60`/`60_75`).
 - **preferences** — single row (id=1) storing targeting `industries`/`roles`/
   `seniority_focus`, editable from the Cold Email Tracker UI.
+- **suggested_contacts** — candidates found by the `contact-discovery` skill, pending
+  human review (`status`: `pending`/`added`/`dismissed`); promoting one always goes
+  through `insertContact`, never a raw insert.
+- **discovery_preferences** — single row (id=1): `target_schools`, `require_connection`
+  (`any`/`connected_only`/`not_connected_only`), `exclude_recruiters` — narrows what
+  `contact-discovery` searches for.
+- **resume** — single row (id=1): `raw_text` + locally-extracted `keywords` (no LLM
+  call), used as discovery match signal.
 
 Access this data two ways:
 - From the Next.js app: `lib/db/contacts.ts`, `lib/db/applications.ts`,
-  `lib/db/targetCompanies.ts`, `lib/db/preferences.ts`.
+  `lib/db/targetCompanies.ts`, `lib/db/preferences.ts`, `lib/db/suggestedContacts.ts`,
+  `lib/db/discoveryPreferences.ts`, `lib/db/resume.ts`.
 - From a skill/script: `npx tsx scripts/db-cli.ts <resource> <action> [args]` — a thin
   CLI over the same functions, so skills never write raw SQL and always go through the
-  dedup guard.
+  dedup guard. Resources: `contacts`, `applications`, `target-companies`, `preferences`,
+  `suggested-contacts`, `discovery-preferences`, `resume`.
 
 ## The dedup guard (critical — do not bypass)
 
@@ -56,6 +69,10 @@ a second way to set `status = 'sent'` that skips it.
   preferences and the fixed target-company list; dedups against the tracker.
 - `outreach-recommender` — cross-references applications against contacts to suggest who
   to reach out to or follow up with next.
+- `contact-discovery` — WebSearches for new people (biomedical AI/medical
+  devices/informatics) matching resume + targeting/discovery preferences; writes
+  candidates to `suggested_contacts` for review on `/cold-email`, never directly into
+  `contacts`. On-demand only, no scraping/enrichment API.
 - `biomed-research` — symlinked from `vendor/bme-research/.claude/skills/biomed-research`
   (kept in sync automatically since it's a symlink into the submodule's working tree).
   Writes profiles under `research/` relative to wherever it's invoked from — when working
@@ -75,8 +92,9 @@ a second way to set `status = 'sent'` that skips it.
 ## Common commands
 
 ```bash
-npm run dev     # start the app
-npm run seed    # (re-)populate seed contacts + target companies
+npm run dev          # start the app
+npm run seed         # (re-)populate seed contacts + target companies
+npm run import-sheet # one-time import of scripts/fixtures/cold-email-sheet.json
 npm run lint
 npx tsc --noEmit
 ```

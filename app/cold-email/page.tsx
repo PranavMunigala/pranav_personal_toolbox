@@ -1,21 +1,53 @@
-import { listContacts } from "@/lib/db/contacts";
+import { listContacts, type ContactFilters } from "@/lib/db/contacts";
 import { getPreferences } from "@/lib/db/preferences";
+import { getDiscoveryPreferences } from "@/lib/db/discoveryPreferences";
+import { getResume } from "@/lib/db/resume";
+import { listSuggestedContacts, latestBatchDate } from "@/lib/db/suggestedContacts";
+import { SuggestedContactsCard } from "@/components/cold-email/suggested-contacts-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContactTable } from "@/components/cold-email/contact-table";
+import { ContactFilterBar } from "@/components/cold-email/contact-filter-bar";
 import { AddContactDialog } from "@/components/cold-email/add-contact-dialog";
 import { PreferencesCard } from "@/components/cold-email/preferences-card";
+import { ResumeCard } from "@/components/cold-email/resume-card";
+import { DiscoveryPreferencesCard } from "@/components/cold-email/discovery-preferences-card";
+import type { ConnectionStatus, ContactStatus, SeniorityTier } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
 
-export default function ColdEmailPage() {
-  const contacts = listContacts();
+export default async function ColdEmailPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | undefined>>;
+}) {
+  const params = await searchParams;
+  const filters: ContactFilters = {
+    status: params.status as ContactStatus | undefined,
+    company: params.company,
+    seniority_tier: params.seniority_tier as SeniorityTier | undefined,
+    connection_status: params.connection_status as ConnectionStatus | undefined,
+    is_recruiter: params.is_recruiter === "true" ? true : undefined,
+    alma_mater: params.alma_mater,
+    industry_tag: params.industry_tag,
+  };
+
+  const allContacts = listContacts();
+  const contacts = listContacts(filters);
   const preferences = getPreferences();
+  const discoveryPreferences = getDiscoveryPreferences();
+  const resume = getResume();
+  const suggestions = listSuggestedContacts();
+  const suggestionsBatchDate = latestBatchDate();
+
+  const allIndustryTags = Array.from(
+    new Set(allContacts.flatMap((c) => JSON.parse(c.industry_tags) as string[]))
+  ).sort();
 
   const stats = {
-    total: contacts.length,
-    sent: contacts.filter((c) => c.status === "sent").length,
-    coffeeChatted: contacts.filter((c) => c.status === "coffee_chatted").length,
-    noResponse: contacts.filter((c) => c.status === "no_response").length,
+    total: allContacts.length,
+    sent: allContacts.filter((c) => c.status === "sent").length,
+    coffeeChatted: allContacts.filter((c) => c.status === "coffee_chatted").length,
+    noResponse: allContacts.filter((c) => c.status === "no_response").length,
   };
 
   return (
@@ -38,11 +70,28 @@ export default function ColdEmailPage() {
         <StatTile label="No response" value={stats.noResponse} />
       </div>
 
-      <PreferencesCard
-        industries={JSON.parse(preferences.industries)}
-        roles={JSON.parse(preferences.roles)}
-        seniorityFocus={JSON.parse(preferences.seniority_focus)}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <PreferencesCard
+          industries={JSON.parse(preferences.industries)}
+          roles={JSON.parse(preferences.roles)}
+          seniorityFocus={JSON.parse(preferences.seniority_focus)}
+        />
+        <DiscoveryPreferencesCard
+          targetSchools={JSON.parse(discoveryPreferences.target_schools)}
+          requireConnection={discoveryPreferences.require_connection}
+          excludeRecruiters={Boolean(discoveryPreferences.exclude_recruiters)}
+        />
+      </div>
+
+      <ResumeCard
+        filename={resume?.filename ?? null}
+        uploadedAt={resume?.uploaded_at ?? null}
+        keywordCount={resume ? (JSON.parse(resume.keywords) as string[]).length : 0}
       />
+
+      <SuggestedContactsCard suggestions={suggestions} batchDate={suggestionsBatchDate} />
+
+      <ContactFilterBar allIndustryTags={allIndustryTags} />
 
       <ContactTable contacts={contacts} />
     </div>

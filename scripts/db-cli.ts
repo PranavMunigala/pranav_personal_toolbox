@@ -4,7 +4,8 @@
  *
  * Usage: npx tsx scripts/db-cli.ts <resource> <action> [args...]
  *
- * contacts list [--status=STATUS] [--company=NAME]
+ * contacts list [--status=] [--company=] [--seniority_tier=] [--connection_status=]
+ *                [--is_recruiter=true|false] [--alma_mater=] [--industry_tag=] [--q=]
  * contacts get <id>
  * contacts find-by-linkedin <url>
  * contacts find-by-company <company>
@@ -24,6 +25,17 @@
  *
  * preferences get
  * preferences set '<json {industries?, roles?, seniority_focus?, notes?}>'
+ *
+ * suggested-contacts list [--discovered_at=YYYY-MM-DD]   # defaults to latest pending batch
+ * suggested-contacts add '<json NewSuggestedContact>'
+ * suggested-contacts promote <id> ['<json overrides>']
+ * suggested-contacts dismiss <id>
+ *
+ * discovery-preferences get
+ * discovery-preferences set '<json {target_schools?, require_connection?, exclude_recruiters?, notes?}>'
+ *
+ * resume get
+ * resume set '<json {raw_text, filename?}>'
  */
 import {
   listContacts,
@@ -46,7 +58,20 @@ import {
 } from "../lib/db/applications";
 import { listTargetCompanies } from "../lib/db/targetCompanies";
 import { getPreferences, updatePreferences } from "../lib/db/preferences";
-import type { ApplicationStatus, ContactStatus } from "../lib/db/types";
+import {
+  listSuggestedContacts,
+  insertSuggestedContact,
+  promoteSuggestedContact,
+  dismissSuggestedContact,
+} from "../lib/db/suggestedContacts";
+import { getDiscoveryPreferences, updateDiscoveryPreferences } from "../lib/db/discoveryPreferences";
+import { getResume, setResume } from "../lib/db/resume";
+import type {
+  ApplicationStatus,
+  ConnectionStatus,
+  ContactStatus,
+  SeniorityTier,
+} from "../lib/db/types";
 
 function out(value: unknown) {
   console.log(JSON.stringify(value, null, 2));
@@ -67,15 +92,19 @@ function flag(name: string): string | undefined {
 
 switch (`${resource} ${action}`) {
   case "contacts list": {
-    let contacts = listContacts();
-    const status = flag("status");
-    const company = flag("company");
-    if (status) contacts = contacts.filter((c) => c.status === status);
-    if (company)
-      contacts = contacts.filter(
-        (c) => c.company?.toLowerCase() === company.toLowerCase()
-      );
-    out(contacts);
+    const isRecruiter = flag("is_recruiter");
+    out(
+      listContacts({
+        status: flag("status") as ContactStatus | undefined,
+        company: flag("company"),
+        seniority_tier: flag("seniority_tier") as SeniorityTier | undefined,
+        connection_status: flag("connection_status") as ConnectionStatus | undefined,
+        is_recruiter: isRecruiter === undefined ? undefined : isRecruiter === "true",
+        alma_mater: flag("alma_mater"),
+        industry_tag: flag("industry_tag"),
+        q: flag("q"),
+      })
+    );
     break;
   }
   case "contacts get": {
@@ -179,6 +208,52 @@ switch (`${resource} ${action}`) {
       roles: JSON.parse(p.roles),
       seniority_focus: JSON.parse(p.seniority_focus),
     });
+    break;
+  }
+
+  case "suggested-contacts list": {
+    out(listSuggestedContacts(flag("discovered_at")));
+    break;
+  }
+  case "suggested-contacts add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    out(insertSuggestedContact(payload));
+    break;
+  }
+  case "suggested-contacts promote": {
+    const id = Number(args[0]);
+    const overrides = args[1] ? JSON.parse(args[1]) : undefined;
+    const result = promoteSuggestedContact(id, overrides);
+    if (!result.ok) fail(result.reason);
+    out(result.contact);
+    break;
+  }
+  case "suggested-contacts dismiss": {
+    out(dismissSuggestedContact(Number(args[0])));
+    break;
+  }
+
+  case "discovery-preferences get": {
+    const p = getDiscoveryPreferences();
+    out({ ...p, target_schools: JSON.parse(p.target_schools) });
+    break;
+  }
+  case "discovery-preferences set": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    const p = updateDiscoveryPreferences(payload);
+    out({ ...p, target_schools: JSON.parse(p.target_schools) });
+    break;
+  }
+
+  case "resume get": {
+    const r = getResume();
+    out(r ? { ...r, keywords: JSON.parse(r.keywords) } : null);
+    break;
+  }
+  case "resume set": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    const r = setResume(payload);
+    out({ ...r, keywords: JSON.parse(r.keywords) });
     break;
   }
 
