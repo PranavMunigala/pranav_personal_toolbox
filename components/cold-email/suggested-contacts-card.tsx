@@ -55,8 +55,7 @@ export function SuggestedContactsCard({
       <CardContent>
         {suggestions.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No new suggested contacts yet. Ask Claude Code to run the{" "}
-            <code>contact-discovery</code> skill to find some.
+            No new suggested contacts yet. Use &quot;Run contact discovery&quot; above to find some.
           </p>
         ) : (
           <div className="space-y-3">

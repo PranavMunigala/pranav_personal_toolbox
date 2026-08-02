@@ -44,3 +44,9 @@ export function updateDiscoveryPreferences(patch: {
   });
   return getDiscoveryPreferences();
 }
+
+export function touchDiscoveryRunTimestamp(): void {
+  db.prepare(
+    `UPDATE discovery_preferences SET last_discovery_run_at = datetime('now') WHERE id = 1`
+  ).run();
+}

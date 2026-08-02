@@ -34,6 +34,25 @@ const CONTACTS_NEW_COLUMNS: Record<string, string> = {
   connection_status:
     "TEXT NOT NULL DEFAULT 'not_connected' CHECK (connection_status IN ('not_connected', 'pending', 'connected'))",
   alma_mater: "TEXT",
+  is_close_connection: "INTEGER NOT NULL DEFAULT 0",
+  relation: "TEXT",
+};
+
+const DISCOVERY_PREFERENCES_NEW_COLUMNS: Record<string, string> = {
+  last_discovery_run_at: "TEXT",
+};
+
+const APPLICATIONS_NEW_COLUMNS: Record<string, string> = {
+  interview_contact_name: "TEXT",
+  interview_contact_email: "TEXT",
+};
+
+const PREFERENCES_NEW_COLUMNS: Record<string, string> = {
+  last_internship_refresh_at: "TEXT",
+};
+
+const SUGGESTED_APPLICATIONS_NEW_COLUMNS: Record<string, string> = {
+  filter_failures: "TEXT", // JSON array of reason strings; null if it passed all enabled filters
 };
 
 function createConnection(): Database.Database {
@@ -44,6 +63,10 @@ function createConnection(): Database.Database {
   db.exec(fs.readFileSync(SCHEMA_PATH, "utf-8"));
   addMissingColumns(db, "contacts", CONTACTS_NEW_COLUMNS);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_contacts_connection_status ON contacts(connection_status);`);
+  addMissingColumns(db, "discovery_preferences", DISCOVERY_PREFERENCES_NEW_COLUMNS);
+  addMissingColumns(db, "applications", APPLICATIONS_NEW_COLUMNS);
+  addMissingColumns(db, "preferences", PREFERENCES_NEW_COLUMNS);
+  addMissingColumns(db, "suggested_applications", SUGGESTED_APPLICATIONS_NEW_COLUMNS);
   return db;
 }
 

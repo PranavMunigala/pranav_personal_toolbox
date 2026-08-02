@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   Table,
@@ -18,10 +19,11 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { ApplicationStatusBadge } from "./application-status-badge";
 import { deleteApplicationAction, setApplicationStatusAction } from "@/app/internships/actions";
 import type { Application, ApplicationStatus, Contact } from "@/lib/db/types";
-import { MoreHorizontal, ExternalLink } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Star } from "lucide-react";
 
 const STATUS_OPTIONS: ApplicationStatus[] = [
   "applied",
@@ -35,9 +37,11 @@ const STATUS_OPTIONS: ApplicationStatus[] = [
 export function ApplicationsTable({
   applications,
   contactsByCompany,
+  closeConnectionsByCompany,
 }: {
   applications: Application[];
   contactsByCompany: Record<string, Contact[]>;
+  closeConnectionsByCompany: Record<string, Contact[]>;
 }) {
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
@@ -81,7 +85,7 @@ export function ApplicationsTable({
               <TableHead>Role</TableHead>
               <TableHead>Location</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Contacts there</TableHead>
+              <TableHead>Coffee chatted</TableHead>
               <TableHead>Applied</TableHead>
               <TableHead className="w-10" />
             </TableRow>
@@ -89,11 +93,26 @@ export function ApplicationsTable({
           <TableBody>
             {filtered.map((a) => {
               const linkedContacts = contactsByCompany[a.company.toLowerCase()] ?? [];
+              const closeConnections = closeConnectionsByCompany[a.company.toLowerCase()] ?? [];
               return (
                 <TableRow key={a.id}>
                   <TableCell className="font-medium">
                     <div className="flex items-center gap-1.5">
-                      {a.company}
+                      <Link href={`/internships/${a.id}`} className="hover:underline">
+                        {a.company}
+                      </Link>
+                      {closeConnections.length > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="gap-1 font-normal"
+                          title={closeConnections
+                            .map((c) => `${c.name}${c.relation ? ` (${c.relation})` : ""}`)
+                            .join(", ")}
+                        >
+                          <Star className="size-3" />
+                          Close connection
+                        </Badge>
+                      )}
                       {a.link && (
                         <a
                           href={a.link}

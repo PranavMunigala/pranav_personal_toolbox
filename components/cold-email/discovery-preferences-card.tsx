@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -37,16 +38,19 @@ export function DiscoveryPreferencesCard({
   targetSchools,
   requireConnection,
   excludeRecruiters,
+  notes,
 }: {
   targetSchools: string[];
   requireConnection: RequireConnection;
   excludeRecruiters: boolean;
+  notes: string | null;
 }) {
   const [open, setOpen] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [schoolsText, setSchoolsText] = useState(targetSchools.join(", "));
   const [connection, setConnection] = useState<RequireConnection>(requireConnection);
   const [excludeRec, setExcludeRec] = useState(excludeRecruiters);
+  const [notesText, setNotesText] = useState(notes ?? "");
 
   function submit() {
     startTransition(async () => {
@@ -57,6 +61,7 @@ export function DiscoveryPreferencesCard({
           .filter(Boolean),
         require_connection: connection,
         exclude_recruiters: excludeRec,
+        notes: notesText.trim() || null,
       });
       if (!result.ok) {
         toast.error(result.message);
@@ -122,6 +127,15 @@ export function DiscoveryPreferencesCard({
                   onCheckedChange={(checked) => setExcludeRec(checked)}
                 />
                 <Label htmlFor="exclude-recruiters">Exclude recruiters</Label>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Standing context for discovery (optional)</Label>
+                <Textarea
+                  rows={3}
+                  placeholder="e.g. Prioritize early-stage startups over big companies."
+                  value={notesText}
+                  onChange={(e) => setNotesText(e.target.value)}
+                />
               </div>
             </div>
             <DialogFooter>

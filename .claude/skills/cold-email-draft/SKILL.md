@@ -40,6 +40,16 @@ person get emailed twice.
    - Never fabricate shared connections, achievements, or details not present in the
      contact's stored profile text/notes.
 
+   ### Subject line
+
+   Write a short subject line too (research on cold/networking outreach: 2–4 word
+   subjects get meaningfully higher open rates than longer ones, and a subject specific
+   to the recipient's role/company/topic roughly doubles reply rate vs a generic one).
+   - 2–4 words, specific to their role, company, or the topic — never a bare generic
+     phrase like "Quick question" or "Would love to connect".
+   - Good examples: "Your path into medtech", "Question about Stryker R&D", "BME grad,
+     quick chat?".
+
    ### Sign-off block (always use exactly this)
    ```
    Best,

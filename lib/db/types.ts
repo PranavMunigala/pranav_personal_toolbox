@@ -29,6 +29,8 @@ export interface Contact {
   is_recruiter: number; // SQLite boolean: 0/1
   connection_status: ConnectionStatus;
   alma_mater: string | null;
+  is_close_connection: number; // SQLite boolean: 0/1
+  relation: string | null; // e.g. "Theta Tau", "friend", "mom's friend"
 }
 
 export type ApplicationStatus =
@@ -52,6 +54,8 @@ export interface Application {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  interview_contact_name: string | null;
+  interview_contact_email: string | null;
 }
 
 export type CommuteTier = "under_30" | "30_45" | "45_60" | "60_75";
@@ -71,6 +75,16 @@ export interface Preferences {
   seniority_focus: string; // JSON-encoded string[]
   notes: string | null;
   updated_at: string;
+  last_internship_refresh_at: string | null;
+}
+
+export interface EmailDraft {
+  id: number;
+  contact_id: number;
+  subject: string | null;
+  body: string;
+  seniority_tier_used: SeniorityTier;
+  created_at: string;
 }
 
 export type SuggestedContactStatus = "pending" | "added" | "dismissed";
@@ -97,6 +111,38 @@ export interface DiscoveryPreferences {
   require_connection: RequireConnection;
   exclude_recruiters: number; // 0/1
   notes: string | null;
+  updated_at: string;
+  last_discovery_run_at: string | null;
+}
+
+export type SuggestedApplicationStatus = "pending" | "added" | "dismissed";
+
+export interface SuggestedApplication {
+  id: number;
+  company: string;
+  role: string;
+  link: string | null;
+  location: string | null;
+  date_posted: string | null;
+  source_snippet: string | null;
+  match_reasons: string | null;
+  discovered_at: string; // DATE, groups a search run into a "batch"
+  status: SuggestedApplicationStatus;
+  promoted_application_id: number | null;
+  created_at: string;
+  filter_failures: string | null; // JSON-encoded string[] of reasons; null if it passed all enabled filters
+}
+
+export interface InternshipFilterSettings {
+  id: 1;
+  role_type_enabled: number; // 0/1
+  paid_only_enabled: number; // 0/1
+  location_enabled: number; // 0/1
+  location_state: string;
+  seniority_enabled: number; // 0/1
+  eligible_class_years: string; // JSON-encoded string[]
+  relevance_enabled: number; // 0/1
+  relevance_min_score: number;
   updated_at: string;
 }
 

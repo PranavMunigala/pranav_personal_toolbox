@@ -49,3 +49,7 @@ export function updatePreferences(patch: {
   });
   return getPreferences();
 }
+
+export function touchInternshipRefreshTimestamp(): void {
+  db.prepare(`UPDATE preferences SET last_internship_refresh_at = datetime('now') WHERE id = 1`).run();
+}

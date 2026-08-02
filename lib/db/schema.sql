@@ -102,6 +102,44 @@ CREATE TABLE IF NOT EXISTS resume (
   uploaded_at TEXT
 );
 
+-- Candidate postings found by internship search (daily target-company refresh or a
+-- specific query), pending human review. Never a source of truth on its own: promoting
+-- one always goes through lib/db/applications.ts::insertApplication, same pattern as
+-- suggested_contacts -> insertContact.
+CREATE TABLE IF NOT EXISTS suggested_applications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  company TEXT NOT NULL,
+  role TEXT NOT NULL,
+  link TEXT,
+  location TEXT,
+  date_posted TEXT,
+  source_snippet TEXT,
+  match_reasons TEXT,
+  discovered_at TEXT NOT NULL DEFAULT (date('now')),
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'added', 'dismissed')),
+  promoted_application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_suggested_applications_discovered_at ON suggested_applications(discovered_at);
+CREATE INDEX IF NOT EXISTS idx_suggested_applications_status ON suggested_applications(status);
+
+-- Toggleable/editable hardcoded internship-search filters. Singleton row (id=1),
+-- defaults matching the originally-specified always-on rules. Read fresh on every
+-- search run (lib/discovery/internshipFilters.ts) so edits apply live.
+CREATE TABLE IF NOT EXISTS internship_filter_settings (
+  id INTEGER PRIMARY KEY CHECK (id = 1),
+  role_type_enabled INTEGER NOT NULL DEFAULT 1,
+  paid_only_enabled INTEGER NOT NULL DEFAULT 1,
+  location_enabled INTEGER NOT NULL DEFAULT 1,
+  location_state TEXT NOT NULL DEFAULT 'NJ',
+  seniority_enabled INTEGER NOT NULL DEFAULT 1,
+  eligible_class_years TEXT NOT NULL DEFAULT '["sophomore","junior"]', -- JSON array
+  relevance_enabled INTEGER NOT NULL DEFAULT 1,
+  relevance_min_score INTEGER NOT NULL DEFAULT 3,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
 CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company);
 CREATE INDEX IF NOT EXISTS idx_applications_company ON applications(company);

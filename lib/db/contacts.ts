@@ -17,6 +17,8 @@ export interface NewContact {
   is_recruiter?: boolean;
   connection_status?: ConnectionStatus;
   alma_mater?: string | null;
+  is_close_connection?: boolean;
+  relation?: string | null;
 }
 
 export interface ContactFilters {
@@ -95,8 +97,8 @@ export function insertContact(c: NewContact): Contact {
   const info = db
     .prepare(
       `INSERT INTO contacts
-        (name, linkedin_url, email, company, title, seniority_tier, industry_tags, status, profile_text, notes, date_last_contacted, phone, is_recruiter, connection_status, alma_mater)
-       VALUES (@name, @linkedin_url, @email, @company, @title, @seniority_tier, @industry_tags, @status, @profile_text, @notes, @date_last_contacted, @phone, @is_recruiter, @connection_status, @alma_mater)`
+        (name, linkedin_url, email, company, title, seniority_tier, industry_tags, status, profile_text, notes, date_last_contacted, phone, is_recruiter, connection_status, alma_mater, is_close_connection, relation)
+       VALUES (@name, @linkedin_url, @email, @company, @title, @seniority_tier, @industry_tags, @status, @profile_text, @notes, @date_last_contacted, @phone, @is_recruiter, @connection_status, @alma_mater, @is_close_connection, @relation)`
     )
     .run({
       name: c.name,
@@ -114,6 +116,8 @@ export function insertContact(c: NewContact): Contact {
       is_recruiter: c.is_recruiter ? 1 : 0,
       connection_status: c.connection_status ?? "not_connected",
       alma_mater: c.alma_mater ?? null,
+      is_close_connection: c.is_close_connection ? 1 : 0,
+      relation: c.relation ?? null,
     });
   return getContact(Number(info.lastInsertRowid))!;
 }
@@ -140,6 +144,11 @@ export function updateContact(id: number, patch: Partial<NewContact>): Contact {
       patch.is_recruiter !== undefined ? (patch.is_recruiter ? 1 : 0) : existing.is_recruiter,
     connection_status: patch.connection_status ?? existing.connection_status,
     alma_mater: patch.alma_mater ?? existing.alma_mater,
+    is_close_connection:
+      patch.is_close_connection !== undefined
+        ? (patch.is_close_connection ? 1 : 0)
+        : existing.is_close_connection,
+    relation: patch.relation ?? existing.relation,
   };
   db.prepare(
     `UPDATE contacts SET
@@ -147,6 +156,7 @@ export function updateContact(id: number, patch: Partial<NewContact>): Contact {
       seniority_tier=@seniority_tier, industry_tags=@industry_tags, status=@status,
       profile_text=@profile_text, notes=@notes, date_last_contacted=@date_last_contacted,
       phone=@phone, is_recruiter=@is_recruiter, connection_status=@connection_status, alma_mater=@alma_mater,
+      is_close_connection=@is_close_connection, relation=@relation,
       updated_at=datetime('now')
      WHERE id=@id`
   ).run({ ...merged, id });
@@ -196,6 +206,25 @@ export function markCoffeeChatted(id: number): Contact {
     status: "coffee_chatted",
     date_last_contacted: new Date().toISOString(),
   });
+}
+
+export function findContactsByName(name: string): Contact[] {
+  return db
+    .prepare(`SELECT * FROM contacts WHERE name = ? COLLATE NOCASE`)
+    .all(name.trim()) as Contact[];
+}
+
+/**
+ * Sweeps contacts stuck in 'sent' for 30+ days with no response and flips them to
+ * 'no_response'. Cheap enough to run on every page load — no scheduler needed.
+ */
+export function applyNoResponseAging(): void {
+  db.prepare(
+    `UPDATE contacts SET status = 'no_response', updated_at = datetime('now')
+     WHERE status = 'sent'
+       AND date_last_contacted IS NOT NULL
+       AND julianday('now') - julianday(date_last_contacted) > 30`
+  ).run();
 }
 
 export function deleteContact(id: number): void {

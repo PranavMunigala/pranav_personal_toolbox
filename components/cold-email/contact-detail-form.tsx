@@ -38,6 +38,10 @@ export function ContactDetailForm({ contact }: { contact: Contact }) {
     contact.connection_status
   );
   const [isRecruiter, setIsRecruiter] = useState(Boolean(contact.is_recruiter));
+  const [isCloseConnection, setIsCloseConnection] = useState(
+    Boolean(contact.is_close_connection)
+  );
+  const [relation, setRelation] = useState(contact.relation ?? "");
   const [profileText, setProfileText] = useState(contact.profile_text ?? "");
   const [notes, setNotes] = useState(contact.notes ?? "");
 
@@ -58,6 +62,8 @@ export function ContactDetailForm({ contact }: { contact: Contact }) {
         alma_mater: almaMater || null,
         connection_status: connectionStatus,
         is_recruiter: isRecruiter,
+        is_close_connection: isCloseConnection,
+        relation: relation || null,
         profile_text: profileText || null,
         notes: notes || null,
       });
@@ -169,6 +175,23 @@ export function ContactDetailForm({ contact }: { contact: Contact }) {
               onCheckedChange={(checked) => setIsRecruiter(checked)}
             />
             <Label htmlFor="is_recruiter">This person is a recruiter</Label>
+          </div>
+          <div className="grid grid-cols-2 gap-3 items-end">
+            <div className="flex items-center gap-2 pb-2">
+              <Checkbox
+                id="close_connection"
+                checked={isCloseConnection}
+                onCheckedChange={(checked) => setIsCloseConnection(checked)}
+              />
+              <Label htmlFor="close_connection">Am I close with this person?</Label>
+            </div>
+            <Field label="Relation">
+              <Input
+                placeholder="e.g. Theta Tau, friend, mom's friend"
+                value={relation}
+                onChange={(e) => setRelation(e.target.value)}
+              />
+            </Field>
           </div>
           <Field label="Pasted profile text (About / Experience)">
             <Textarea rows={5} value={profileText} onChange={(e) => setProfileText(e.target.value)} />

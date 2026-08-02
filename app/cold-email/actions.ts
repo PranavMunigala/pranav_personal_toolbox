@@ -13,6 +13,9 @@ import { updatePreferences } from "@/lib/db/preferences";
 import { updateDiscoveryPreferences } from "@/lib/db/discoveryPreferences";
 import { setResume } from "@/lib/db/resume";
 import { promoteSuggestedContact, dismissSuggestedContact } from "@/lib/db/suggestedContacts";
+import { runContactDiscovery, runDailyDiscovery } from "@/lib/discovery/runContactDiscovery";
+import { enrichContacts } from "@/lib/discovery/enrichContacts";
+import { draftEmailForContact } from "@/lib/email/draftEmail";
 import type { ConnectionStatus, ContactStatus, RequireConnection, SeniorityTier } from "@/lib/db/types";
 
 export interface ActionResult {
@@ -29,6 +32,8 @@ export async function createContactAction(input: {
   industry_tags: string[];
   profile_text?: string;
   notes?: string;
+  is_close_connection?: boolean;
+  relation?: string;
 }): Promise<ActionResult> {
   if (!input.name.trim()) return { ok: false, message: "Name is required." };
 
@@ -51,6 +56,8 @@ export async function createContactAction(input: {
     industry_tags: input.industry_tags,
     profile_text: input.profile_text || null,
     notes: input.notes || null,
+    is_close_connection: input.is_close_connection,
+    relation: input.relation || null,
   });
 
   revalidatePath("/cold-email");
@@ -106,6 +113,8 @@ export async function updateContactAction(
     is_recruiter?: boolean;
     connection_status?: ConnectionStatus;
     alma_mater?: string | null;
+    is_close_connection?: boolean;
+    relation?: string | null;
   }
 ): Promise<ActionResult> {
   if (patch.name !== undefined && !patch.name.trim()) {
@@ -131,10 +140,43 @@ export async function updateDiscoveryPreferencesAction(input: {
   target_schools: string[];
   require_connection: RequireConnection;
   exclude_recruiters: boolean;
+  notes?: string | null;
 }): Promise<ActionResult> {
   updateDiscoveryPreferences(input);
   revalidatePath("/cold-email");
   return { ok: true, message: "Discovery preferences updated." };
+}
+
+export async function runContactDiscoveryAction(customQuery?: string): Promise<ActionResult> {
+  try {
+    const result = await runContactDiscovery(customQuery);
+    revalidatePath("/cold-email");
+    if (result.added.length === 0) {
+      return { ok: true, message: result.note || "No new matches found." };
+    }
+    return {
+      ok: true,
+      message: `Found ${result.added.length} new suggested contact${result.added.length === 1 ? "" : "s"}.`,
+    };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Discovery run failed." };
+  }
+}
+
+export async function runDailyDiscoveryAction(): Promise<ActionResult> {
+  try {
+    const result = await runDailyDiscovery();
+    revalidatePath("/cold-email");
+    if (result.added.length === 0) {
+      return { ok: true, message: result.note || "No new matches found." };
+    }
+    return {
+      ok: true,
+      message: `Found ${result.added.length} new suggested contact${result.added.length === 1 ? "" : "s"}.`,
+    };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Daily discovery run failed." };
+  }
 }
 
 export async function uploadResumeAction(input: {
@@ -150,13 +192,59 @@ export async function uploadResumeAction(input: {
 
 export async function promoteSuggestedContactAction(id: number): Promise<ActionResult> {
   const result = promoteSuggestedContact(id);
-  revalidatePath("/cold-email");
   if (!result.ok) return { ok: false, message: result.reason };
-  return { ok: true, message: `${result.contact.name} added to the tracker.` };
+
+  let draftReady = false;
+  try {
+    await draftEmailForContact(result.contact.id);
+    draftReady = true;
+  } catch (err) {
+    // Best-effort: a drafting failure must never undo a successful Add.
+    console.error(`Auto-draft failed for contact ${result.contact.id}:`, err);
+  }
+
+  revalidatePath("/cold-email");
+  revalidatePath(`/cold-email/${result.contact.id}`);
+  return {
+    ok: true,
+    message: draftReady
+      ? `${result.contact.name} added to the tracker — draft ready.`
+      : `${result.contact.name} added to the tracker.`,
+  };
 }
 
 export async function dismissSuggestedContactAction(id: number): Promise<ActionResult> {
   dismissSuggestedContact(id);
   revalidatePath("/cold-email");
   return { ok: true, message: "Suggestion dismissed." };
+}
+
+export async function enrichContactsAction(namesInput: string): Promise<ActionResult> {
+  try {
+    const names = namesInput.split(",").map((n) => n.trim()).filter(Boolean);
+    const result = await enrichContacts(names);
+    revalidatePath("/cold-email");
+    const parts: string[] = [];
+    if (result.updated > 0) {
+      parts.push(`Filled in missing info for ${result.updated} contact${result.updated === 1 ? "" : "s"}.`);
+    } else {
+      parts.push(result.note);
+    }
+    if (result.notFoundNames.length > 0) {
+      parts.push(`Not found: ${result.notFoundNames.join(", ")}.`);
+    }
+    return { ok: true, message: parts.join(" ") };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Enrichment failed." };
+  }
+}
+
+export async function draftEmailAction(contactId: number): Promise<ActionResult> {
+  try {
+    await draftEmailForContact(contactId);
+    revalidatePath(`/cold-email/${contactId}`);
+    return { ok: true, message: "Draft ready." };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Drafting failed." };
+  }
 }

@@ -15,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -37,6 +38,8 @@ export function AddContactDialog() {
   const [tier, setTier] = useState<SeniorityTier>("mid");
   const [industryTags, setIndustryTags] = useState("");
   const [profileText, setProfileText] = useState("");
+  const [isCloseConnection, setIsCloseConnection] = useState(false);
+  const [relation, setRelation] = useState("");
 
   function reset() {
     setName("");
@@ -46,6 +49,8 @@ export function AddContactDialog() {
     setTier("mid");
     setIndustryTags("");
     setProfileText("");
+    setIsCloseConnection(false);
+    setRelation("");
   }
 
   function submit() {
@@ -61,6 +66,8 @@ export function AddContactDialog() {
           .map((t) => t.trim())
           .filter(Boolean),
         profile_text: profileText || undefined,
+        is_close_connection: isCloseConnection,
+        relation: relation || undefined,
       });
       if (!result.ok) {
         toast.error(result.message);
@@ -141,6 +148,25 @@ export function AddContactDialog() {
                 placeholder="AI healthcare, comp bio"
                 value={industryTags}
                 onChange={(e) => setIndustryTags(e.target.value)}
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3 items-end">
+            <div className="flex items-center gap-2 pb-2">
+              <Checkbox
+                id="close-connection"
+                checked={isCloseConnection}
+                onCheckedChange={(checked) => setIsCloseConnection(checked)}
+              />
+              <Label htmlFor="close-connection">Am I close with this person?</Label>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="relation">Relation</Label>
+              <Input
+                id="relation"
+                placeholder="e.g. Theta Tau, friend, mom's friend"
+                value={relation}
+                onChange={(e) => setRelation(e.target.value)}
               />
             </div>
           </div>

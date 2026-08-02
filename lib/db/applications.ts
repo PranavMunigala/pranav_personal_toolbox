@@ -73,6 +73,43 @@ export function updateApplicationStatus(id: number, status: ApplicationStatus): 
   return getApplication(id)!;
 }
 
+export function updateApplication(
+  id: number,
+  patch: Partial<{
+    company: string;
+    role: string;
+    link: string | null;
+    location: string | null;
+    date_posted: string | null;
+    status: ApplicationStatus;
+    notes: string | null;
+    interview_contact_name: string | null;
+    interview_contact_email: string | null;
+  }>
+): Application {
+  const existing = getApplication(id);
+  if (!existing) throw new Error(`Application ${id} not found`);
+  const merged = {
+    company: patch.company ?? existing.company,
+    role: patch.role ?? existing.role,
+    link: patch.link ?? existing.link,
+    location: patch.location ?? existing.location,
+    date_posted: patch.date_posted ?? existing.date_posted,
+    status: patch.status ?? existing.status,
+    notes: patch.notes ?? existing.notes,
+    interview_contact_name: patch.interview_contact_name ?? existing.interview_contact_name,
+    interview_contact_email: patch.interview_contact_email ?? existing.interview_contact_email,
+  };
+  db.prepare(
+    `UPDATE applications SET
+      company=@company, role=@role, link=@link, location=@location, date_posted=@date_posted,
+      status=@status, notes=@notes, interview_contact_name=@interview_contact_name,
+      interview_contact_email=@interview_contact_email, updated_at=datetime('now')
+     WHERE id=@id`
+  ).run({ ...merged, id });
+  return getApplication(id)!;
+}
+
 export function linkContactToApplication(applicationId: number, contactId: number): void {
   db.prepare(
     "INSERT OR IGNORE INTO application_contacts (application_id, contact_id) VALUES (?, ?)"

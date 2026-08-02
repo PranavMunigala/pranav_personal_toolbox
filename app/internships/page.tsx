@@ -1,24 +1,42 @@
 import { listApplications } from "@/lib/db/applications";
 import { listContacts } from "@/lib/db/contacts";
 import { listTargetCompanies } from "@/lib/db/targetCompanies";
+import { getPreferences } from "@/lib/db/preferences";
+import { listSuggestedApplications, latestBatchDate } from "@/lib/db/suggestedApplications";
+import { getInternshipFilterSettings } from "@/lib/db/internshipFilterSettings";
+import { getInternshipRateLimitStatus } from "@/lib/discovery/runInternshipSearch";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ApplicationsTable } from "@/components/internships/applications-table";
 import { AddApplicationDialog } from "@/components/internships/add-application-dialog";
 import { TargetCompaniesCard } from "@/components/internships/target-companies-card";
+import { RunInternshipSearchCard } from "@/components/internships/run-internship-search-card";
+import { DailyInternshipRefreshCard } from "@/components/internships/daily-internship-refresh-card";
+import { SuggestedApplicationsCard } from "@/components/internships/suggested-applications-card";
+import { FilterSettingsCard } from "@/components/internships/filter-settings-card";
+import type { Contact } from "@/lib/db/types";
 
 export const dynamic = "force-dynamic";
-import type { Contact } from "@/lib/db/types";
 
 export default function InternshipsPage() {
   const applications = listApplications();
   const contacts = listContacts();
   const targetCompanies = listTargetCompanies();
+  const preferences = getPreferences();
+  const suggestions = listSuggestedApplications();
+  const suggestionsBatchDate = latestBatchDate();
+  const rateLimit = getInternshipRateLimitStatus(preferences.last_internship_refresh_at);
+  const filterSettings = getInternshipFilterSettings();
 
+  // Only coffee-chatted contacts are worth surfacing as "people you know" at a company —
+  // matching every not_contacted contact by company name was noisy and not useful.
   const contactsByCompany: Record<string, Contact[]> = {};
+  const closeConnectionsByCompany: Record<string, Contact[]> = {};
   for (const c of contacts) {
     if (!c.company) continue;
     const key = c.company.toLowerCase();
-    (contactsByCompany[key] ??= []).push(c);
+    if (c.status === "coffee_chatted") (contactsByCompany[key] ??= []).push(c);
+    if (c.is_close_connection) (closeConnectionsByCompany[key] ??= []).push(c);
   }
 
   const stats = {
@@ -50,9 +68,36 @@ export default function InternshipsPage() {
         <StatTile label="Offers" value={stats.offers} />
       </div>
 
-      <ApplicationsTable applications={applications} contactsByCompany={contactsByCompany} />
+      <Tabs defaultValue="search">
+        <TabsList>
+          <TabsTrigger value="search">Search</TabsTrigger>
+          <TabsTrigger value="filters">Filters</TabsTrigger>
+        </TabsList>
 
-      <TargetCompaniesCard companies={targetCompanies} />
+        <TabsContent value="search" className="space-y-8 pt-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <RunInternshipSearchCard />
+            <DailyInternshipRefreshCard
+              isRateLimited={rateLimit.isRateLimited}
+              nextAvailableLabel={rateLimit.nextAvailableLabel}
+            />
+          </div>
+
+          <SuggestedApplicationsCard suggestions={suggestions} batchDate={suggestionsBatchDate} />
+
+          <ApplicationsTable
+            applications={applications}
+            contactsByCompany={contactsByCompany}
+            closeConnectionsByCompany={closeConnectionsByCompany}
+          />
+
+          <TargetCompaniesCard companies={targetCompanies} />
+        </TabsContent>
+
+        <TabsContent value="filters" className="pt-4">
+          <FilterSettingsCard settings={filterSettings} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

@@ -13,6 +13,10 @@ export function findTargetCompanyByName(name: string): TargetCompany | undefined
     .get(name) as TargetCompany | undefined;
 }
 
+export function deleteTargetCompany(id: number): void {
+  db.prepare("DELETE FROM target_companies WHERE id = ?").run(id);
+}
+
 export function upsertTargetCompany(
   c: Omit<TargetCompany, "id" | "location" | "notes"> & {
     location?: string | null;
