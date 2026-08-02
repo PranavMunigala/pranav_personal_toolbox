@@ -31,6 +31,15 @@
  * suggested-contacts promote <id> ['<json overrides>']
  * suggested-contacts dismiss <id>
  *
+ * suggested-applications list [--discovered_at=YYYY-MM-DD]   # defaults to latest pending batch
+ * suggested-applications list-keys                            # every company/role/link ever suggested, for dedup
+ * suggested-applications add '<json NewSuggestedApplication>'
+ * suggested-applications promote <id> ['<json overrides>']
+ * suggested-applications dismiss <id>
+ *
+ * email-drafts list-for-contact <contactId>
+ * email-drafts add '<json NewEmailDraft>'
+ *
  * discovery-preferences get
  * discovery-preferences set '<json {target_schools?, require_connection?, exclude_recruiters?, notes?}>'
  *
@@ -66,6 +75,14 @@ import {
 } from "../lib/db/suggestedContacts";
 import { getDiscoveryPreferences, updateDiscoveryPreferences } from "../lib/db/discoveryPreferences";
 import { getResume, setResume } from "../lib/db/resume";
+import {
+  listSuggestedApplications,
+  listAllSuggestedApplicationKeys,
+  insertSuggestedApplication,
+  promoteSuggestedApplication,
+  dismissSuggestedApplication,
+} from "../lib/db/suggestedApplications";
+import { listDraftsForContact, insertEmailDraft } from "../lib/db/emailDrafts";
 import type {
   ApplicationStatus,
   ConnectionStatus,
@@ -230,6 +247,42 @@ switch (`${resource} ${action}`) {
   }
   case "suggested-contacts dismiss": {
     out(dismissSuggestedContact(Number(args[0])));
+    break;
+  }
+
+  case "suggested-applications list": {
+    out(listSuggestedApplications(flag("discovered_at")));
+    break;
+  }
+  case "suggested-applications list-keys": {
+    out(listAllSuggestedApplicationKeys());
+    break;
+  }
+  case "suggested-applications add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    out(insertSuggestedApplication(payload));
+    break;
+  }
+  case "suggested-applications promote": {
+    const id = Number(args[0]);
+    const overrides = args[1] ? JSON.parse(args[1]) : undefined;
+    const result = promoteSuggestedApplication(id, overrides);
+    if (!result.ok) fail(result.reason);
+    out(result.application);
+    break;
+  }
+  case "suggested-applications dismiss": {
+    out(dismissSuggestedApplication(Number(args[0])));
+    break;
+  }
+
+  case "email-drafts list-for-contact": {
+    out(listDraftsForContact(Number(args[0])));
+    break;
+  }
+  case "email-drafts add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    out(insertEmailDraft(payload));
     break;
   }
 

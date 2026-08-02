@@ -73,6 +73,17 @@ below.
    create a contact record. If nothing new was found, say so plainly rather than
    stretching to report stale or already-tracked people.
 
+## Automated invocation
+
+When invoked headlessly (`claude -p /contact-discovery ...` from the app's
+`runContactDiscovery()`/`runDailyDiscovery()`, not an interactive session), the prompt
+gives you `max_candidates` (cap for step 4) and optionally a `custom_query` string to
+fold into your search terms alongside preferences/resume signal. Follow steps 1–5
+exactly as above (still write via `suggested-contacts add`), but skip step 6's
+user-facing report — instead return only the final JSON result `{"addedCount": <number
+of suggestions you wrote>, "note": "<one sentence on how the search went>"}`, no
+surrounding prose.
+
 ## Constraints
 
 - WebSearch only — no scraping of LinkedIn or any site requiring login, same

@@ -21,32 +21,45 @@ for it in that moment.
 - If you (an agent) are ever unsure whether an action would send an email, stop and ask
   first rather than proceeding.
 
-## LLM / search provider (in-app AI features)
+## AI provider (in-app AI features)
 
 The app's own AI-powered features (contact discovery, internship search, posting
 verification, contact enrichment, email drafting — everything under `lib/discovery/`
-and `lib/email/`) run on **OpenRouter + TinyFish**, not the Anthropic API directly, even
-though this whole toolbox is built and maintained via Claude Code:
+and `lib/email/`) run by shelling out to the **Claude Code CLI itself**
+(`lib/claudeCode/runSkill.ts::runSkill()`), invoking the same interactive skills under
+`.claude/skills/` headlessly — not a direct OpenRouter/TinyFish API integration. There
+is no more separate/parallel AI stack: the app and an interactive Claude Code session
+now go through the exact same skill instructions.
 
-- **Text generation/reasoning** — `lib/openrouter/client.ts::callOpenRouter()`, a thin
-  `fetch` wrapper around `https://openrouter.ai/api/v1/chat/completions`
-  (`OPENROUTER_API_KEY`). Two presets: `MODEL_LIGHT` (`@preset/pranav`, DeepSeek v4
-  Flash) for filtering/classification/verification, `MODEL_HEAVY`
-  (`@preset/pranav-high`, Kimi K3) for relevance ranking/reasoning and writing. Uses
-  `response_format: json_schema` for structured output — no tool-calling, since custom
-  OpenRouter presets aren't confirmed to support it reliably.
-- **Web search/fetch** — `lib/tinyfish/client.ts` (`TINYFISH_API_KEY`, free, no
-  credits). `searchWeb()` hits `api.search.tinyfish.ai`; `fetchUrls()` posts to
-  `api.fetch.tinyfish.ai` (renders in a real Chromium browser, so it works on JS-heavy
-  boards like LinkedIn/Handshake that a plain HTTP fetch can't read — up to 10 URLs per
-  request, chunked automatically for more). Search/fetch is done in plain code, then the
-  real results are handed to OpenRouter as context to reason over — this decouples
-  "can we get live web data" from "does this LLM preset support tools," which is more
-  reliable than delegating browsing to the model itself.
-- Every discovery/search module follows the same shape: gather real material via
-  TinyFish → one `callOpenRouter()` call with a JSON-schema-constrained prompt to
-  extract/classify/rank → app-layer filtering/dedup on the structured result → write to
-  the DB. See `lib/discovery/verifyPosting.ts` for the simplest example of this pattern.
+- `runSkill({ skill, prompt, jsonSchema, allowedTools, timeoutMs })` spawns `claude -p
+  "/<skill> <prompt>" --output-format json --json-schema <schema> --allowedTools
+  <scoped list> --disallowedTools "Edit Write NotebookEdit" --no-session-persistence
+  --strict-mcp-config --permission-mode manual` as a child process rooted at the repo,
+  parses the `structured_output` field of the JSON envelope, and kills the process on
+  timeout. Tool access is always scoped per-call to exactly what that flow needs (e.g.
+  `Bash(npx tsx scripts/db-cli.ts:*)`, `WebSearch`, `WebFetch`) — **never** a blanket
+  `--dangerously-skip-permissions`, since this runs unattended from a server action.
+- Each skill invoked this way does its own real work — WebSearch/WebFetch and reasoning
+  natively as Claude, plus persistence via `scripts/db-cli.ts` — and returns one final
+  JSON result matching a small schema (e.g. `{addedCount, note}`). The calling
+  `lib/discovery/*`/`lib/email/*` function then re-queries the DB directly (by
+  before/after id snapshot) to build its return value, so the DB — not the model's
+  self-report — is always the source of truth for what actually got written.
+- Deterministic, non-negotiable business logic stays real TypeScript that skills shell
+  out to rather than being reimplemented in prose: `lib/discovery/internshipFilters.ts`
+  (hardcoded eligibility rules) is exposed to the `internship-search` skill via `npx tsx
+  scripts/internship-filter-cli.ts check`. Rate limiting/cooldown gating
+  (`getDiscoveryRateLimitStatus`, `getInternshipRateLimitStatus`, the `MAX_NAMES_PER_RUN`
+  cap on enrichment) also stays pure TypeScript in the `lib/discovery/*`/`lib/email/*`
+  wrappers — it decides *whether* to spend a `claude -p` invocation at all, not
+  something delegated to the model. Each headless invocation costs real API money, so
+  these pre-flight guards matter for cost control, not just correctness.
+- Six skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`
+  (the three pre-existing ones, each gaining an "Automated invocation" section in their
+  SKILL.md describing the headless prompt/result contract), plus a new
+  `contact-enrichment` skill (there was previously no skill equivalent to
+  `enrichContacts()`). `internship-intake` and `contact-intake` remain
+  interactive-only — no server action shells out to them.
 
 ## Modules / routes
 
@@ -111,27 +124,33 @@ though this whole toolbox is built and maintained via Claude Code:
   refresh, rate-limited once/24h (gated by `preferences.last_internship_refresh_at`),
   always restricted to the `target_companies` list only, "however many are new" up to a
   generous sanity cap (20) — returns zero rather than backfilling with non-target
-  postings. Both search across named sources (GitHub internship-tracking repos as the
-  most reliable, plus ZipRecruiter, Jobright.ai, and site-restricted LinkedIn/general
-  web queries) via real TinyFish `searchWeb()` calls built in code
-  (`buildQueries()`), not model-directed browsing — no Handshake/LinkedIn/ZipRecruiter
-  credentials exist or are needed; Handshake specifically cannot be searched at all
-  (school-login-gated, no public index) and the prompt tells the model to flag that when
-  relevant rather than silently omit it. Every candidate from either entry point is
-  scored against the same **hardcoded filters** module
+  postings. Both delegate the actual search/reasoning/persistence to the
+  `internship-search` skill via `runSkill()` (see "AI provider" above) — the skill
+  covers named sources (GitHub internship-tracking repos as the most reliable, plus
+  ZipRecruiter, Jobright.ai, and site-restricted LinkedIn/general web queries) via its
+  own native WebSearch calls, not TypeScript-built queries — no Handshake/LinkedIn/
+  ZipRecruiter credentials exist or are needed; Handshake specifically cannot be
+  searched at all (school-login-gated, no public index) and the skill's instructions
+  say to flag that when relevant rather than silently omit it. Every candidate is scored
+  against the same **hardcoded filters** module
   (`lib/discovery/internshipFilters.ts::checkHardcodedFilters` — role type, paid-only,
-  location/term, seniority/class-year, resume relevance — enforced in code against
-  structured fields the model must emit, not just prompted). Each filter returns a
+  location/term, seniority/class-year, resume relevance — enforced in code, called by
+  the skill via `npx tsx scripts/internship-filter-cli.ts check` against structured
+  fields the skill must emit per candidate, not just prompted). Each filter returns a
   pass/fail *and* a human-readable reason on failure, not just a boolean, so failures
   aren't silently dropped: a candidate that fails ≥1 enabled filter but still has a link
   is kept as a **near-miss** rather than discarded. Both fully-passing and near-miss
-  candidates then go through the same **live verification** gate
-  (`lib/discovery/verifyPosting.ts::verifyPostings` — fetches each candidate's actual URL
-  via TinyFish and asks OpenRouter to classify the real fetched content; only
-  `confirmed_open` survives from either group — postings with no link, or that can't be
-  confirmed either way, are excluded rather than shown). Verification is a hard,
-  non-toggleable gate; only the 5 hardcoded eligibility rules are soft/visible/
-  overridable. Verified near-misses are capped separately (5/run) and inserted with
+  candidates then go through the same **live verification** gate — the skill WebFetches
+  each candidate's actual URL and classifies the real fetched content itself (the rules
+  live in `internship-search`'s SKILL.md, previously in the now-deleted
+  `lib/discovery/verifyPosting.ts`); only `confirmed_open` survives from either group —
+  postings with no link, or that can't be confirmed either way, are excluded rather than
+  shown. Verification is a hard, non-toggleable gate; only the 5 hardcoded eligibility
+  rules are soft/visible/overridable. The skill writes both buckets directly via `npx
+  tsx scripts/db-cli.ts suggested-applications add`; the TS wrapper in
+  `runInternshipSearch.ts` re-queries the DB by before/after id snapshot afterward to
+  build its return value (source of truth, not the model's self-report). Verified
+  near-misses are capped separately (5/run) and inserted with
   `filter_failures` populated; the UI (`suggested-applications-card.tsx`) shows them in
   a separate "Didn't fully match — review" section with the specific reasons as badges,
   and Add/Dismiss work identically to full matches (Add = override, Dismiss = reject).
@@ -159,7 +178,9 @@ Access this data two ways:
 - From a skill/script: `npx tsx scripts/db-cli.ts <resource> <action> [args]` — a thin
   CLI over the same functions, so skills never write raw SQL and always go through the
   dedup guard. Resources: `contacts`, `applications`, `target-companies`, `preferences`,
-  `suggested-contacts`, `discovery-preferences`, `resume`.
+  `suggested-contacts`, `suggested-applications`, `email-drafts`, `discovery-preferences`,
+  `resume`. This is also how headlessly-invoked skills (via `runSkill()`) persist
+  everything they find/draft — see "AI provider" above.
 
 ## The dedup guard (critical — do not bypass)
 
@@ -172,18 +193,32 @@ a second way to set `status = 'sent'` that skips it.
 ## Skills (`.claude/skills/`)
 
 - `contact-intake` — structures a pasted LinkedIn URL + profile text into a contact row.
+  Interactive-only, not invoked headlessly by the app.
 - `cold-email-draft` — drafts seniority-tiered outreach emails; enforces the dedup guard;
-  never sends (draft-only, user copies into Gmail themselves).
+  never sends (draft-only, user copies into Gmail themselves). Invoked both
+  interactively and headlessly by `lib/email/draftEmail.ts::draftEmailForContact()` (see
+  its "Automated invocation" section).
 - `internship-intake` — parses a pasted job posting URL (via WebFetch) into an
-  application row.
-- `internship-search` — searches (via WebSearch) for new postings matching targeting
-  preferences and the fixed target-company list; dedups against the tracker.
+  application row. Interactive-only, not invoked headlessly by the app.
+- `internship-search` — searches (via WebSearch/WebFetch) for new postings matching
+  targeting preferences and the fixed target-company list; scores against hardcoded
+  filters, live-verifies, dedups against the tracker, writes to `suggested_applications`.
+  Invoked both interactively and headlessly by
+  `lib/discovery/runInternshipSearch.ts::runInternshipSearch()`/
+  `runDailyInternshipRefresh()`.
 - `outreach-recommender` — cross-references applications against contacts to suggest who
-  to reach out to or follow up with next.
+  to reach out to or follow up with next. Interactive-only, not invoked headlessly by
+  the app.
 - `contact-discovery` — WebSearches for new people (biomedical AI/medical
   devices/informatics) matching resume + targeting/discovery preferences; writes
   candidates to `suggested_contacts` for review on `/cold-email`, never directly into
-  `contacts`. On-demand only, no scraping/enrichment API.
+  `contacts`. On-demand only, no scraping/enrichment API. Invoked both interactively and
+  headlessly by `lib/discovery/runContactDiscovery.ts::runContactDiscovery()`/
+  `runDailyDiscovery()`.
+- `contact-enrichment` — given a list of existing contact names, WebSearches each and
+  fills only missing `linkedin_url`/`alma_mater`/`industry_tags` fields, never
+  overwrites or creates. Invoked headlessly by
+  `lib/discovery/enrichContacts.ts::enrichContacts()`.
 - `biomed-research` — symlinked from `vendor/bme-research/.claude/skills/biomed-research`
   (kept in sync automatically since it's a symlink into the submodule's working tree).
   Writes profiles under `research/` relative to wherever it's invoked from — when working

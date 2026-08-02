@@ -105,6 +105,23 @@ person get emailed twice.
    `coffee_chatted`. If it refuses, surface that message to the user as-is; don't try to
    work around it.
 
+## Automated invocation
+
+When invoked headlessly (`claude -p /cold-email-draft ...` from the app's
+`draftEmailForContact()`, not an interactive session), the prompt gives you a
+`contact_id` instead of a name/URL to search for:
+
+1. Look up the contact via `npx tsx scripts/db-cli.ts contacts get <contact_id>`.
+2. Still enforce step 2 above (refuse if `status` is `sent`/`coffee_chatted`). If
+   refusing, return `{"ok": false, "refusal_reason": "<why>", "subject": null, "body":
+   null}` — do not fabricate a draft to satisfy the schema.
+3. Otherwise, draft per step 3 above and return `{"ok": true, "refusal_reason": null,
+   "subject": "...", "body": "..."}`.
+4. Skip steps 4–5 entirely (no interactive user to show the draft to, and this
+   invocation never persists to `email_drafts` or changes contact status — the caller
+   does that itself with the returned fields).
+5. Return only the final JSON result — no surrounding prose.
+
 ## "Who should I reach out to next" mode
 
 If asked for suggestions rather than a specific contact, run:
