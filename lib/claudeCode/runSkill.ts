@@ -1,4 +1,6 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 // Bridge from the Next.js server runtime to a headless Claude Code invocation of one of
@@ -8,7 +10,24 @@ import path from "node:path";
 // access is scoped per-call via allowedTools — never a blanket
 // --dangerously-skip-permissions — since this runs unattended from a server action.
 
-const PROJECT_ROOT = path.resolve(__dirname, "../..");
+const PROJECT_ROOT = process.cwd();
+
+// child_process.spawn resolves the executable purely via process.env.PATH, which isn't
+// guaranteed to include ~/.local/bin (e.g. non-login shells, IDE task runners). Resolve
+// an absolute path once so headless invocation doesn't depend on how the server was launched.
+function resolveClaudeBin(): string {
+  if (process.env.CLAUDE_BIN) return process.env.CLAUDE_BIN;
+  const candidates = [
+    path.join(os.homedir(), ".local/bin/claude"),
+    "/usr/local/bin/claude",
+  ];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return "claude"; // fall back to PATH lookup
+}
+
+const CLAUDE_BIN = resolveClaudeBin();
 
 export interface RunSkillOptions {
   /** Name of the skill under .claude/skills/, invoked as /<skill> <prompt>. */
@@ -86,7 +105,7 @@ function spawnWithTimeout(
   timeoutMs: number
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
   return new Promise((resolve, reject) => {
-    const child = spawn("claude", args, { cwd: PROJECT_ROOT });
+    const child = spawn(CLAUDE_BIN, args, { cwd: PROJECT_ROOT });
 
     let stdout = "";
     let stderr = "";

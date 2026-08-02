@@ -3,7 +3,6 @@
 import { useTransition } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -43,65 +42,39 @@ export function SuggestedApplicationsCard({
     });
   }
 
+  // Defensively hide anything with filter_failures set (e.g. legacy rows from before
+  // near-misses were removed) — only fully-passing postings are ever shown.
   const fullMatches = suggestions.filter((s) => !s.filter_failures);
-  const nearMisses = suggestions.filter((s) => s.filter_failures);
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Suggested postings{batchDate ? ` — ${batchDate}` : ""}</CardTitle>
-          <CardDescription>
-            Postings found by internship search, matched against your resume and
-            preferences. Review before adding — nothing here is tracked automatically.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {fullMatches.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No new suggested postings yet. Use the search cards above to find some.
-            </p>
-          ) : (
-            <div className="space-y-3">
-              {fullMatches.map((s) => (
-                <SuggestionRow
-                  key={s.id}
-                  suggestion={s}
-                  isPending={isPending}
-                  onAdd={add}
-                  onDismiss={dismiss}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {nearMisses.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Didn&apos;t fully match — review</CardTitle>
-            <CardDescription>
-              Failed one or more enabled filters but is still a confirmed-live posting.
-              Add anyway if it&apos;s worth it, or dismiss.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {nearMisses.map((s) => (
-                <SuggestionRow
-                  key={s.id}
-                  suggestion={s}
-                  isPending={isPending}
-                  onAdd={add}
-                  onDismiss={dismiss}
-                />
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle>Suggested postings{batchDate ? ` — ${batchDate}` : ""}</CardTitle>
+        <CardDescription>
+          Postings found by internship search, matched against your resume and
+          preferences. Review before adding — nothing here is tracked automatically.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {fullMatches.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No new suggested postings yet. Use the search cards above to find some.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {fullMatches.map((s) => (
+              <SuggestionRow
+                key={s.id}
+                suggestion={s}
+                isPending={isPending}
+                onAdd={add}
+                onDismiss={dismiss}
+              />
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -116,7 +89,6 @@ function SuggestionRow({
   onAdd: (id: number) => void;
   onDismiss: (id: number) => void;
 }) {
-  const failures = s.filter_failures ? (JSON.parse(s.filter_failures) as string[]) : [];
   return (
     <div className="rounded-lg border p-3 flex items-start justify-between gap-4">
       <div className="space-y-1">
@@ -136,15 +108,6 @@ function SuggestionRow({
         <p className="text-sm text-muted-foreground">{s.location || "—"}</p>
         {s.match_reasons && (
           <p className="text-xs text-muted-foreground italic">{s.match_reasons}</p>
-        )}
-        {failures.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {failures.map((reason, i) => (
-              <Badge key={i} variant="destructive">
-                {reason}
-              </Badge>
-            ))}
-          </div>
         )}
       </div>
       <div className="flex gap-2 shrink-0">

@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local sqlite data store
 /data/
+
+# cron job logs
+/logs/

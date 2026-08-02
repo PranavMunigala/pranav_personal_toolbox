@@ -107,12 +107,9 @@ export async function linkContactAction(
   return { ok: true, message: "Contact linked." };
 }
 
-function formatSearchResultMessage(added: number, nearMisses: number, note: string): string {
-  if (added === 0 && nearMisses === 0) return note || "No new matches found.";
-  const parts: string[] = [];
-  if (added > 0) parts.push(`${added} new posting${added === 1 ? "" : "s"}`);
-  if (nearMisses > 0) parts.push(`${nearMisses} near-match${nearMisses === 1 ? "" : "es"} to review`);
-  return `Found ${parts.join(" and ")}.`;
+function formatSearchResultMessage(added: number, note: string): string {
+  if (added === 0) return note || "No new matches found.";
+  return `Found ${added} new posting${added === 1 ? "" : "s"}.`;
 }
 
 export async function runInternshipSearchAction(customQuery?: string): Promise<ActionResult> {
@@ -121,7 +118,7 @@ export async function runInternshipSearchAction(customQuery?: string): Promise<A
     revalidatePath("/internships");
     return {
       ok: true,
-      message: formatSearchResultMessage(result.added.length, result.nearMisses.length, result.note),
+      message: formatSearchResultMessage(result.added.length, result.note),
     };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Internship search failed." };
@@ -134,7 +131,7 @@ export async function runDailyInternshipRefreshAction(): Promise<ActionResult> {
     revalidatePath("/internships");
     return {
       ok: true,
-      message: formatSearchResultMessage(result.added.length, result.nearMisses.length, result.note),
+      message: formatSearchResultMessage(result.added.length, result.note),
     };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Daily refresh failed." };

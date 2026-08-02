@@ -16,16 +16,14 @@ const RESULT_SCHEMA = {
   type: "object",
   properties: {
     addedCount: { type: "integer" },
-    nearMissCount: { type: "integer" },
     note: { type: "string" },
   },
-  required: ["addedCount", "nearMissCount", "note"],
+  required: ["addedCount", "note"],
   additionalProperties: false,
 } as const;
 
 export interface InternshipSearchResult {
   added: SuggestedApplication[];
-  nearMisses: SuggestedApplication[];
   note: string;
 }
 
@@ -61,7 +59,7 @@ async function runPipeline(
     .filter(Boolean)
     .join(" ");
 
-  const result = await runSkill<{ addedCount: number; nearMissCount: number; note: string }>({
+  const result = await runSkill<{ addedCount: number; note: string }>({
     skill: "internship-search",
     prompt,
     jsonSchema: RESULT_SCHEMA,
@@ -75,12 +73,13 @@ async function runPipeline(
   });
 
   // Re-query the DB (source of truth) for whatever the skill actually wrote, rather than
-  // trusting the model's self-reported counts to build the returned rows.
-  const newRows = listSuggestedApplications().filter((a) => a.id > maxIdBefore);
-  const added = newRows.filter((a) => !a.filter_failures);
-  const nearMisses = newRows.filter((a) => a.filter_failures);
+  // trusting the model's self-reported count to build the returned rows. Defensively
+  // exclude anything with filter_failures set — only fully-passing postings are surfaced.
+  const added = listSuggestedApplications()
+    .filter((a) => a.id > maxIdBefore)
+    .filter((a) => !a.filter_failures);
 
-  return { added, nearMisses, note: result.note };
+  return { added, note: result.note };
 }
 
 /**

@@ -65,13 +65,12 @@ into `applications`.
    ```
    This returns `[{candidate_index, pass, failedReasons}]` per candidate, respecting
    whatever filters are currently enabled/configured in the app's Filters settings.
-   Candidates that `pass` go in the **passed** bucket; candidates that fail ≥1 filter
-   but still have a link go in the **near-miss** bucket (don't discard them — they're
-   surfaced separately for the user to override or dismiss).
+   Candidates that `pass` continue to the next step; candidates that fail ≥1 filter are
+   **discarded** — only postings that meet every currently-enabled filter are ever
+   surfaced.
 
-6. **Live-verify every passed + near-miss candidate's link** with WebFetch — this is a
-   hard, non-toggleable gate applied to both buckets equally. For each posting's actual
-   fetched page content, classify:
+6. **Live-verify every passed candidate's link** with WebFetch — this is a hard,
+   non-toggleable gate. For each posting's actual fetched page content, classify:
    - **`confirmed_closed`**: content says "closed," "no longer accepting applications,"
      "position filled"; a 404/error page; or a generic careers/search homepage instead
      of the specific posting.
@@ -80,24 +79,24 @@ into `applications`.
    - **`unconfirmed`**: login wall, empty/JS shell with no real posting content, or you
      genuinely can't tell either way — never guess `confirmed_open` without real
      evidence in the fetched content.
-   Only `confirmed_open` candidates survive into the next step, from **both** buckets.
+   Only `confirmed_open` candidates survive into the next step.
 
-7. **Cap and rank**: sort survivors in each bucket by `relevance_score` descending, then
-   cap the passed bucket at the run's requested max and the near-miss bucket at 5.
+7. **Cap and rank**: sort survivors by `relevance_score` descending, then cap at the
+   run's requested max.
 
 8. **Write each survivor via the CLI, never raw SQL**:
    ```
    npx tsx scripts/db-cli.ts suggested-applications add '{"company": "...", "role": "...", "link": "...", "location": "...", "date_posted": "...", "source_snippet": "...", "match_reasons": "...", "filter_failures": null}'
    ```
-   For near-miss candidates, set `filter_failures` to the `failedReasons` array from
-   step 5 instead of `null`. Each call defaults `discovered_at` to today.
+   `filter_failures` is always `null` — only fully-passing, live-verified postings ever
+   get written. Each call defaults `discovered_at` to today.
 
 9. **Report results to the user**: what was added (grouped: target-company matches
-   first by commute tier, then broad matches), and near-misses with their specific
-   failure reasons. If nothing new/verified turned up, say so plainly — that's a
-   completely valid outcome, don't pad with weak or unverified matches. For adding one
-   to the real tracker, hand off to the `internship-intake` skill's flow (or
-   `suggested-applications promote <id>`) rather than duplicating that logic here.
+   first by commute tier, then broad matches). If nothing new/verified turned up, say so
+   plainly — that's a completely valid outcome, don't pad with weak or unverified
+   matches. For adding one to the real tracker, hand off to the `internship-intake`
+   skill's flow (or `suggested-applications promote <id>`) rather than duplicating that
+   logic here.
 
 ## Automated invocation
 
@@ -106,20 +105,20 @@ When invoked headlessly (`claude -p /internship-search ...` from the app's
 prompt gives you: `custom_query` (optional), `target_companies_only` (boolean — if true,
 step 2's broad search is skipped entirely and only the target-company search runs,
 covering every company in the target-companies list regardless of commute tier), and
-`max_results` (cap for the passed bucket in step 7; near-miss stays capped at 5
-regardless). Follow steps 1–8 exactly as above (still write via `suggested-applications
-add`), but skip step 9's user-facing report — instead return only the final JSON result
-`{"addedCount": <passed candidates written>, "nearMissCount": <near-miss candidates
-written>, "note": "<one or two sentences on how the search went, including any source
-issues like LinkedIn blocking or Handshake being unsearchable>"}`, no surrounding prose.
+`max_results` (cap from step 7). Follow steps 1–8 exactly as above (still write via
+`suggested-applications add`), but skip step 9's user-facing report — instead return
+only the final JSON result `{"addedCount": <candidates written>, "note": "<one or two
+sentences on how the search went, including any source issues like LinkedIn blocking or
+Handshake being unsearchable>"}`, no surrounding prose.
 
 ## Constraints
 
 - WebSearch/WebFetch only — no scraping of LinkedIn or any site requiring login beyond
   what WebFetch naturally renders; never attempt to log in anywhere.
 - Never write directly to `applications` — always land in `suggested_applications` for
-  human review, both fully-passing and near-miss.
+  human review.
 - Live-verification (step 6) is never skippable or toggle-controlled — the hardcoded
-  filters (step 5) are the only user-configurable part.
+  filters (step 5) are the only user-configurable part, and a candidate that fails any
+  enabled filter is discarded, never surfaced for override.
 - Only extract postings actually present in the search/fetch results, with a real URL —
   never invent a posting or rely on prior knowledge beyond what's shown.

@@ -113,11 +113,11 @@ now go through the exact same skill instructions.
   caps at 5 results, gated by `last_discovery_run_at`).
 - **suggested_applications** — postings found by internship search, pending human review
   (same `pending`/`added`/`dismissed` shape as `suggested_contacts`), plus a
-  `filter_failures` column (JSON array of reason strings, null if it passed every
-  enabled filter); promoting one always goes through `insertApplication` (via
-  `findExistingApplication` dedup), never a raw insert — this is unchanged whether the
-  suggestion fully matched or is a near-miss. Two entry points in
-  `lib/discovery/runInternshipSearch.ts`, sharing one internal pipeline:
+  `filter_failures` column (JSON array of reason strings; always null today — see below,
+  kept only for schema compatibility with any pre-existing rows); promoting one always
+  goes through `insertApplication` (via `findExistingApplication` dedup), never a raw
+  insert. Two entry points in `lib/discovery/runInternshipSearch.ts`, sharing one
+  internal pipeline:
   `runInternshipSearch(customQuery?)` is Feature 1 — on-demand casual browsing,
   unlimited runs/day, always broad (never restricted to target companies), up to 5
   fully-passing results/run; `runDailyInternshipRefresh()` is Feature 2 — passive
@@ -137,24 +137,22 @@ now go through the exact same skill instructions.
   location/term, seniority/class-year, resume relevance — enforced in code, called by
   the skill via `npx tsx scripts/internship-filter-cli.ts check` against structured
   fields the skill must emit per candidate, not just prompted). Each filter returns a
-  pass/fail *and* a human-readable reason on failure, not just a boolean, so failures
-  aren't silently dropped: a candidate that fails ≥1 enabled filter but still has a link
-  is kept as a **near-miss** rather than discarded. Both fully-passing and near-miss
-  candidates then go through the same **live verification** gate — the skill WebFetches
-  each candidate's actual URL and classifies the real fetched content itself (the rules
-  live in `internship-search`'s SKILL.md, previously in the now-deleted
-  `lib/discovery/verifyPosting.ts`); only `confirmed_open` survives from either group —
-  postings with no link, or that can't be confirmed either way, are excluded rather than
-  shown. Verification is a hard, non-toggleable gate; only the 5 hardcoded eligibility
-  rules are soft/visible/overridable. The skill writes both buckets directly via `npx
-  tsx scripts/db-cli.ts suggested-applications add`; the TS wrapper in
+  pass/fail *and* a human-readable reason on failure, not just a boolean, but a candidate
+  that fails ≥1 enabled filter is discarded outright — only postings that pass every
+  currently-enabled filter are ever surfaced (no near-miss/override bucket). Passing
+  candidates then go through a **live verification** gate — the skill WebFetches each
+  candidate's actual URL and classifies the real fetched content itself (the rules live
+  in `internship-search`'s SKILL.md, previously in the now-deleted
+  `lib/discovery/verifyPosting.ts`); only `confirmed_open` survives — postings with no
+  link, that fail a filter, or that can't be confirmed either way, are excluded rather
+  than shown. Verification is a hard, non-toggleable gate; the 5 hardcoded eligibility
+  rules are the only user-configurable part (via the Filters tab), and they gate
+  inclusion outright rather than being soft/overridable. The skill writes survivors
+  directly via `npx tsx scripts/db-cli.ts suggested-applications add`; the TS wrapper in
   `runInternshipSearch.ts` re-queries the DB by before/after id snapshot afterward to
-  build its return value (source of truth, not the model's self-report). Verified
-  near-misses are capped separately (5/run) and inserted with
-  `filter_failures` populated; the UI (`suggested-applications-card.tsx`) shows them in
-  a separate "Didn't fully match — review" section with the specific reasons as badges,
-  and Add/Dismiss work identically to full matches (Add = override, Dismiss = reject).
-  Dedup (`lib/db/suggestedApplications.ts::listAllSuggestedApplicationKeys`) checks every
+  build its return value (source of truth, not the model's self-report), defensively
+  filtering out any row with `filter_failures` set. Dedup
+  (`lib/db/suggestedApplications.ts::listAllSuggestedApplicationKeys`) checks every
   suggestion ever made, not just the current pending batch, so a dismissed or
   older-batch posting never resurfaces. Zero results is a valid, expected outcome for
   both features — do not add fallback padding.
