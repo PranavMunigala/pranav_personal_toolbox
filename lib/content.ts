@@ -21,6 +21,10 @@ function firstHeadingAndParagraph(markdown: string): { title: string; excerpt: s
   return { title, excerpt };
 }
 
+export function getMarkdownTitle(markdown: string): string {
+  return firstHeadingAndParagraph(markdown).title;
+}
+
 export function listMarkdownDocs(dirAbsPath: string): ContentDoc[] {
   if (!fs.existsSync(dirAbsPath)) return [];
   return fs

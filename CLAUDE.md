@@ -54,19 +54,24 @@ now go through the exact same skill instructions.
   wrappers — it decides *whether* to spend a `claude -p` invocation at all, not
   something delegated to the model. Each headless invocation costs real API money, so
   these pre-flight guards matter for cost control, not just correctness.
-- Six skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`
-  (the three pre-existing ones, each gaining an "Automated invocation" section in their
-  SKILL.md describing the headless prompt/result contract), plus a new
-  `contact-enrichment` skill (there was previously no skill equivalent to
-  `enrichContacts()`). `internship-intake` and `contact-intake` remain
+- Seven skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`,
+  `biomed-research` (each gaining an "Automated invocation" section in their SKILL.md
+  describing the headless prompt/result contract), plus a `contact-enrichment` skill
+  (there was previously no skill equivalent to `enrichContacts()`). `internship-intake`
+  and `contact-intake` remain
   interactive-only — no server action shells out to them.
 
 ## Modules / routes
 
 - `/cold-email` — outreach contact tracker (`app/cold-email/`)
 - `/internships` — application tracker + target-company list (`app/internships/`)
-- `/research` — biomedical/biotech scouting notes, mirrored from the `vendor/bme-research`
-  submodule (`app/research/`)
+- `/research` — biomedical/biotech scouting notes (`app/research/`), backed by markdown
+  profiles under `research/{companies,products,topics}/` at the project root. The
+  `biomed-research` skill (interactive and headless, via
+  `lib/research/runResearch.ts::runResearch()`) writes/updates these files through
+  `scripts/research-cli.ts` rather than the Write tool directly, so both modes persist
+  profiles the same way. No DB table backs this — the files on disk are the source of
+  truth.
 - `/notes` — RAG study assistant, mirrored from the `vendor/athena` submodule
   (`app/notes/`) — Athena itself is a separate Python/Streamlit app; this route only
   surfaces its docs/corpus, it doesn't run it in-process.
@@ -217,11 +222,12 @@ a second way to set `status = 'sent'` that skips it.
   fills only missing `linkedin_url`/`alma_mater`/`industry_tags` fields, never
   overwrites or creates. Invoked headlessly by
   `lib/discovery/enrichContacts.ts::enrichContacts()`.
-- `biomed-research` — symlinked from `vendor/bme-research/.claude/skills/biomed-research`
-  (kept in sync automatically since it's a symlink into the submodule's working tree).
-  Writes profiles under `research/` relative to wherever it's invoked from — when working
-  in this toolbox, point it at `vendor/bme-research/research/` so content stays in the
-  submodule rather than forking a second copy at the toolbox root.
+- `biomed-research` — lives natively at `.claude/skills/biomed-research/` (no longer a
+  submodule — `bme-research` was folded into this repo's own history). Writes profiles
+  under `research/{companies,products,topics}/` at the project root via
+  `scripts/research-cli.ts`, never the Write tool directly, in both interactive and
+  headless runs. Invoked both interactively and headlessly by
+  `lib/research/runResearch.ts::runResearch()` (see "AI provider" above).
 
 ## Conventions
 
