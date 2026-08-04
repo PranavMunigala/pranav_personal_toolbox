@@ -5,6 +5,8 @@ import { notFound } from "next/navigation";
 import { readMarkdownDoc, getMarkdownTitle } from "@/lib/content";
 import { MarkdownView } from "@/components/markdown-view";
 import { RefreshProfileButton } from "@/components/research/refresh-profile-button";
+import { ResearchChatSidebar } from "@/components/research/research-chat-sidebar";
+import { listChatMessages } from "@/lib/db/researchChat";
 import { ArrowLeft } from "lucide-react";
 
 const RESEARCH_ROOT = path.join(process.cwd(), "research");
@@ -21,6 +23,10 @@ export default async function ResearchDocPage({
 
   const title = getMarkdownTitle(content);
   const lastModified = fs.statSync(filePath).mtime;
+  const chatMessages = listChatMessages(category, slug).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10 space-y-6">
@@ -45,6 +51,8 @@ export default async function ResearchDocPage({
       </div>
 
       <MarkdownView content={content} />
+
+      <ResearchChatSidebar category={category} slug={slug} initialMessages={chatMessages} />
     </div>
   );
 }

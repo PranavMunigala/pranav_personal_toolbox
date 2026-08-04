@@ -153,3 +153,14 @@ export interface Resume {
   filename: string | null;
   uploaded_at: string | null;
 }
+
+export type ResearchChatRole = "user" | "assistant";
+
+export interface ResearchChatMessage {
+  id: number;
+  category: string;
+  slug: string;
+  role: ResearchChatRole;
+  content: string;
+  created_at: string;
+}

@@ -140,6 +140,22 @@ CREATE TABLE IF NOT EXISTS internship_filter_settings (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Follow-up chat transcript per research profile (company/product/topic), shown in
+-- the sidebar chat on a profile's detail page. Keyed by category+slug rather than a
+-- profile id since profiles themselves aren't DB rows — the markdown files under
+-- research/ are the source of truth for profile content, this table only stores the
+-- conversation about them.
+CREATE TABLE IF NOT EXISTS research_chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  category TEXT NOT NULL,
+  slug TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_research_chat_messages_profile ON research_chat_messages(category, slug);
+
 CREATE INDEX IF NOT EXISTS idx_contacts_status ON contacts(status);
 CREATE INDEX IF NOT EXISTS idx_contacts_company ON contacts(company);
 CREATE INDEX IF NOT EXISTS idx_applications_company ON applications(company);

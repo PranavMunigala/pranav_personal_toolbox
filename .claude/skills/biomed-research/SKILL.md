@@ -39,10 +39,28 @@ If the user supplied a link or background text, incorporate it but still verify/
 
 ## Step 4: Build the profile content using the matching template
 
+**Who you're writing for**: a college student studying biomedical engineering,
+computer science, and math — comfortable with technical/quantitative thinking
+(algorithms, data structures, statistics, systems) but still learning the
+biomedical-domain specifics. When you reach for an analogy, prefer one that maps
+to a CS/math/engineering concept they already know over a generic real-world
+object — e.g. a target-ranking pipeline is like a search/ranking algorithm scoring
+candidates; a generative chemistry model is like sampling from a learned
+probability distribution instead of hand-designing each output; a trial-outcome
+predictor is like a classifier trained on historical labeled examples. Still keep
+one plain-language line so the section stands on its own for a non-CS reader.
+
+**Formatting**: every section below is bullets-and-bold first, paragraphs second.
+Open with at most 1-2 sentences of framing, then deliver the actual facts as
+bullet points with **bolded key terms/names/numbers**. This applies to *every*
+section — Market & Competition, Financials, Team, Careers, Takeaways — not just
+the technology section. A paragraph should only ever be short connective framing;
+it should never be the primary vehicle for delivering multiple facts.
+
 ### Company mode
 
 1. **Company Overview** — location, founding date/story, stage (seed/Series X/public/etc.), core mission, the problem they're fundamentally trying to solve in healthcare or tech.
-2. **Technology & Products** — breakdown of their tech stack, platform architecture, or drug pipeline. Include 2-3 simple analogies and real-world examples of how the technology works in practice (e.g. target validation, molecular docking, data orchestration) — written like a learning companion explaining it, not a spec sheet. Pick a small, representative set of products/pipeline assets to go deep on (roughly 2-4) rather than listing every drug or product a large company has — enough to illustrate the technology well without becoming an overwhelming catalog. End the section with a link (company site, pipeline page, etc.) where the user can dig further on their own if they want the full list.
+2. **Technology & Products** — breakdown of their tech stack, platform architecture, or drug pipeline. Include 2-3 analogies (per the CS/math framing above) and real-world examples of how the technology works in practice (e.g. target validation, molecular docking, data orchestration) — written like a learning companion explaining it, not a spec sheet. Pick a small, representative set of products/pipeline assets to go deep on (roughly 2-4) rather than listing every drug or product a large company has — enough to illustrate the technology well without becoming an overwhelming catalog. End the section with a link (company site, pipeline page, etc.) where the user can dig further on their own if they want the full list.
 3. **Market & Competition** — who they sell to, what differentiates them from competitors, roadblocks that make their market hard to enter.
 4. **Financials** — brief overview only, not an in-depth analysis. For public companies, a couple sentences on revenue/market cap/recent notable filing news. For startups, funding rounds, total raised, investors, and valuation if known — high level, not exhaustive.
 5. **Team, Leadership & Culture** — executive leadership, advisory board, key scientists (this drives the actual analysis — always do this thoroughly). Include 2 sentences on company culture (work environment, values, what employees/reviews say) if findable. Then, as a separate add-on: identify 2-3 recent Rutgers graduates (biomedical engineering majors preferred) who could plausibly be good networking contacts — these don't need to work at the company being profiled; they're general networking leads in the same space/field, found via LinkedIn-style search. Keep this clearly separated as a networking add-on — never let its presence or absence affect how thoroughly the rest of the company is researched.
@@ -85,6 +103,8 @@ Before presenting the final file to the user, do an internal pass (don't show th
 - Remove or flag anything that seems stale, contradictory, or unverifiable rather than leaving it stated as fact.
 - Make sure the Rutgers networking add-on and other add-ons didn't creep into or dilute the core analysis sections.
 - Confirm footnotes (on update runs) are correctly placed and dated.
+- Confirm every section is bullets-and-bold first, not an unbroken paragraph block — reformat any section that's degraded into a blurb.
+- Confirm analogies map to CS/math/engineering concepts where a natural mapping exists, per the framing at the top of Step 4.
 
 ## Step 7: Write the file via the CLI
 
@@ -95,6 +115,27 @@ npx tsx scripts/research-cli.ts write '{"category":"<companies|products|topics>"
 ```
 This returns `{"ok": true, "path": "...", "created": <bool>}`. Then tell the user
 briefly what was written or what changed.
+
+## Step 8: Follow-up chat mode
+
+Used by the profile page's sidebar chat, where the user can ask follow-up
+questions about a company/product/topic they already researched, or tell you to
+fold new information into the saved file. Input is: the profile's existing
+`content`, the prior conversation as `{role, content}` turns, and the latest user
+`message`.
+
+- You may use WebSearch/WebFetch to answer things not already in the file — same
+  constraints as Step 3 (no login-gated scraping; say plainly when something can't
+  be verified rather than guessing).
+- Reply in the same style as the profile itself: simple, bullets-and-bold first,
+  analogies mapped to CS/math/engineering concepts where natural (per Step 4).
+- If the message asks you to add/save/update something in the profile,
+  regenerate the **entire** file content (whole-file, same merge-and-footnote
+  behavior as Step 5) and write it via `research-cli.ts write`, then say plainly
+  in your reply what was added and where. If nothing needs saving, just reply —
+  don't write the file on every turn.
+- Return only structured JSON, no surrounding prose:
+  `{"reply": "<markdown reply>", "profileUpdated": <bool>, "note": "<null or a short note on any source limitation>"}`.
 
 ## Automated invocation
 
@@ -109,6 +150,17 @@ interactive final report — instead return only the final JSON result
 `{"category": "<companies|products|topics>", "slug": "<slug>", "title": "<title>",
 "created": <bool>, "note": "<one or two sentences on how the research went,
 including any source limitations>"}`, no surrounding prose.
+
+## Automated invocation — chat
+
+When invoked headlessly for Step 8 (`claude -p /biomed-research ...` from the
+app's `runResearchChat()`, not an interactive session), the prompt gives you:
+`mode: "chat"`, `category`, `slug`, the profile's current `content`, the prior
+`history` (array of `{role, content}`), and the latest `message`. Follow Step 8
+exactly as above (still write via `research-cli.ts write` only if something needs
+saving), and return only the final JSON result
+`{"reply": "<markdown reply>", "profileUpdated": <bool>, "note": "<null or a short
+note on any source limitation>"}`, no surrounding prose.
 
 ## Constraints
 
