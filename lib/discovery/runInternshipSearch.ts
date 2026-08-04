@@ -16,14 +16,16 @@ const RESULT_SCHEMA = {
   type: "object",
   properties: {
     addedCount: { type: "integer" },
+    tiersSearched: { type: "integer" },
     note: { type: "string" },
   },
-  required: ["addedCount", "note"],
+  required: ["addedCount", "tiersSearched", "note"],
   additionalProperties: false,
 } as const;
 
 export interface InternshipSearchResult {
   added: SuggestedApplication[];
+  tiersSearched: number;
   note: string;
 }
 
@@ -46,7 +48,8 @@ export function getInternshipRateLimitStatus(lastRunAt: string | null): Internsh
 async function runPipeline(
   customQuery: string | undefined,
   targetCompaniesOnly: boolean,
-  maxResults: number
+  maxResults: number,
+  timeoutMs: number
 ): Promise<InternshipSearchResult> {
   // Snapshot the highest existing suggestion id so we can isolate exactly what this run
   // inserts, regardless of how discovered_at buckets land across repeated same-day runs.
@@ -59,7 +62,7 @@ async function runPipeline(
     .filter(Boolean)
     .join(" ");
 
-  const result = await runSkill<{ addedCount: number; note: string }>({
+  const result = await runSkill<{ addedCount: number; tiersSearched: number; note: string }>({
     skill: "internship-search",
     prompt,
     jsonSchema: RESULT_SCHEMA,
@@ -69,7 +72,7 @@ async function runPipeline(
       "WebSearch",
       "WebFetch",
     ],
-    timeoutMs: 480_000,
+    timeoutMs,
   });
 
   // Re-query the DB (source of truth) for whatever the skill actually wrote, rather than
@@ -79,15 +82,24 @@ async function runPipeline(
     .filter((a) => a.id > maxIdBefore)
     .filter((a) => !a.filter_failures);
 
-  return { added, note: result.note };
+  return { added, tiersSearched: result.tiersSearched, note: result.note };
 }
+
+// Feature 1's broad search escalates through up to 3 source tiers on a thin day
+// (see SKILL.md step 2's tiered search + early-stop rule) before giving up, so its
+// worst case does meaningfully more work than a single-tier baseline — 10 min, not 8.
+const FEATURE1_TIMEOUT_MS = 600_000;
+// Feature 2 never touches the tiered broad search (target_companies_only skips it
+// entirely) — one query per target company, same shape of work as before, so its
+// timeout stays at the original 8 min.
+const FEATURE2_TIMEOUT_MS = 480_000;
 
 /**
  * Feature 1 — on-demand casual browsing ("find more to apply to"). Always broad, never
  * restricted to target companies. Unlimited runs/day; fixed at 5 results per run.
  */
 export async function runInternshipSearch(customQuery?: string): Promise<InternshipSearchResult> {
-  return runPipeline(customQuery, false, FEATURE1_MAX_RESULTS);
+  return runPipeline(customQuery, false, FEATURE1_MAX_RESULTS, FEATURE1_TIMEOUT_MS);
 }
 
 /**
@@ -103,7 +115,7 @@ export async function runDailyInternshipRefresh(): Promise<InternshipSearchResul
     );
   }
 
-  const result = await runPipeline(undefined, true, FEATURE2_MAX_RESULTS);
+  const result = await runPipeline(undefined, true, FEATURE2_MAX_RESULTS, FEATURE2_TIMEOUT_MS);
   touchInternshipRefreshTimestamp();
   return result;
 }

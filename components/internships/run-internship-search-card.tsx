@@ -38,9 +38,11 @@ export function RunInternshipSearchCard() {
           On-demand browsing — find more to apply to. Leave blank for a broad search
           ranked by your resume fit, or type what you want (e.g. &quot;data
           intern&quot;). Always searches broadly (not limited to target companies),
-          across GitHub internship-tracking repos, ZipRecruiter, Jobright.ai, LinkedIn
-          (best-effort), and general web search. Same hardcoded filters and live
-          verification as always — 3 results per run, run as many times as you want.
+          starting with GitHub internship-tracking repos and a general web search,
+          then escalating to more job boards (ZipRecruiter, Jobright.ai, LinkedIn,
+          Indeed, WayUp) and niche biomedical sources only if that first pass
+          doesn&apos;t turn up enough matches. Same hardcoded filters and live verification as
+          always — 5 results per run, run as many times as you want.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

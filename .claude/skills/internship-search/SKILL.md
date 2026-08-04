@@ -30,16 +30,50 @@ into `applications`.
    - **Broad criteria search**: newly posted internships/co-ops in AI applied to
      healthcare, biomedical engineering, computational biology, health-tech, and
      anything adjacent to the user's stated roles — posted recently (favor "posted
-     today/this week" signals when the source shows them). Cover named sources: GitHub
-     internship-tracking repos (`site:github.com SimplifyJobs Summer Internships`,
-     `site:github.com vanshb03 Summer Internships`), ZipRecruiter, Jobright.ai,
-     `site:linkedin.com/jobs`, and general web search.
+     today/this week" signals when the source shows them). Run this as a **tiered,
+     budgeted sweep** rather than searching every source every time — see "Tiered
+     broad search" below.
    - **Target-company search**: for each company in the target-companies list, search
      specifically for current internship/entry-level postings at that company.
    - Handshake is NOT searchable at all (school-login-gated, no public index) — if it
      would have been relevant, say so plainly rather than silently omitting it.
      LinkedIn results may be thin or blocked (it aggressively blocks non-browser
      access) — say so if that happens.
+
+### Tiered broad search (cost/time control)
+
+The broad criteria search covers a lot of ground — search it in escalating tiers
+with an early-stop rule, so a typical run (where the first tier already turns up
+enough good postings) stays cheap and fast, and only a genuinely thin day pays the
+cost of a full sweep across every source.
+
+- **Tier 1 (always search)**: the highest-signal, cheapest sources —
+  `site:github.com SimplifyJobs Summer Internships`,
+  `site:github.com vanshb03 Summer Internships`,
+  `site:github.com Ouckah Summer2026-Internships`, plus one general WebSearch for
+  the query terms + "internship" + the current term/year. Issue all of these as one
+  batch of parallel WebSearch calls, not one-by-one with reasoning in between.
+- **Tier 2 (only if Tier 1 fell short — see stop rule)**: broader job boards —
+  ZipRecruiter, Jobright.ai, `site:linkedin.com/jobs`, `site:indeed.com`, and
+  `site:wayup.com`. Also batched as parallel calls.
+- **Tier 3 (only if Tier 1+2 fell short)**: niche/biomedical-specific sources,
+  matching this user's actual field focus rather than generic breadth for its own
+  sake — BioSpace Jobs (`site:biospace.com jobs`) and a general "biomedical
+  engineering internship" / "health-tech internship" web search.
+
+**Stop rule**: after completing a tier's searches, run that tier's new candidates
+through steps 3-6 below (classify, dedup, hardcoded filter, live-verify) before
+deciding whether to escalate. If the running total of fully-verified
+(`confirmed_open`, filter-passing) candidates across all tiers searched so far is
+already ≥ the run's `max_results`, stop — do not search the next tier. Only
+escalate when still short after a tier completes. In the worst case (still short
+after Tier 3), stop anyway and surface whatever verified candidates were found —
+never keep searching indefinitely.
+
+Steps 3-6 below run once per tier (on that tier's new candidates, plus the
+target-company search results alongside Tier 1), not once at the very end — that's
+what makes the stop rule possible. Track how many tiers of the broad search you
+actually searched (1, 2, or 3) as `tiersSearched`, needed for the final result.
 
 3. **Classify every candidate with these structured fields** (used for filtering below —
    be honest and conservative, don't round in the candidate's favor):
@@ -81,8 +115,9 @@ into `applications`.
      evidence in the fetched content.
    Only `confirmed_open` candidates survive into the next step.
 
-7. **Cap and rank**: sort survivors by `relevance_score` descending, then cap at the
-   run's requested max.
+7. **Cap and rank**: once escalation stops (per the stop rule above), sort all
+   surviving candidates across every tier searched by `relevance_score` descending,
+   then cap at the run's requested max.
 
 8. **Write each survivor via the CLI, never raw SQL**:
    ```
@@ -105,11 +140,14 @@ When invoked headlessly (`claude -p /internship-search ...` from the app's
 prompt gives you: `custom_query` (optional), `target_companies_only` (boolean — if true,
 step 2's broad search is skipped entirely and only the target-company search runs,
 covering every company in the target-companies list regardless of commute tier), and
-`max_results` (cap from step 7). Follow steps 1–8 exactly as above (still write via
+`max_results` (cap from step 7). If `target_companies_only` is true, the tiered broad
+search (and `tiersSearched`) doesn't apply — only the target-company search runs, and
+`tiersSearched` should be `0`. Follow steps 1–8 exactly as above (still write via
 `suggested-applications add`), but skip step 9's user-facing report — instead return
-only the final JSON result `{"addedCount": <candidates written>, "note": "<one or two
-sentences on how the search went, including any source issues like LinkedIn blocking or
-Handshake being unsearchable>"}`, no surrounding prose.
+only the final JSON result `{"addedCount": <candidates written>, "tiersSearched": <0-3,
+per the tiered broad search's stop rule>, "note": "<one or two sentences on how the
+search went, including any source issues like LinkedIn blocking or Handshake being
+unsearchable>"}`, no surrounding prose.
 
 ## Constraints
 

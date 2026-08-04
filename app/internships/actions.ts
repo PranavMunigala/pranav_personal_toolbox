@@ -107,9 +107,10 @@ export async function linkContactAction(
   return { ok: true, message: "Contact linked." };
 }
 
-function formatSearchResultMessage(added: number, note: string): string {
-  if (added === 0) return note || "No new matches found.";
-  return `Found ${added} new posting${added === 1 ? "" : "s"}.`;
+function formatSearchResultMessage(added: number, tiersSearched: number, note: string): string {
+  const tierSuffix = tiersSearched > 0 ? ` (checked tier ${tiersSearched} of 3)` : "";
+  if (added === 0) return (note || "No new matches found.") + tierSuffix;
+  return `Found ${added} new posting${added === 1 ? "" : "s"}${tierSuffix}.`;
 }
 
 export async function runInternshipSearchAction(customQuery?: string): Promise<ActionResult> {
@@ -118,7 +119,7 @@ export async function runInternshipSearchAction(customQuery?: string): Promise<A
     revalidatePath("/internships");
     return {
       ok: true,
-      message: formatSearchResultMessage(result.added.length, result.note),
+      message: formatSearchResultMessage(result.added.length, result.tiersSearched, result.note),
     };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Internship search failed." };
@@ -131,7 +132,7 @@ export async function runDailyInternshipRefreshAction(): Promise<ActionResult> {
     revalidatePath("/internships");
     return {
       ok: true,
-      message: formatSearchResultMessage(result.added.length, result.note),
+      message: formatSearchResultMessage(result.added.length, result.tiersSearched, result.note),
     };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Daily refresh failed." };
