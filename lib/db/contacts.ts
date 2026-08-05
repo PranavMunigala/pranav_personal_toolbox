@@ -173,7 +173,11 @@ export function markSent(id: number): { ok: true; contact: Contact } | { ok: fal
   const contact = getContact(id);
   if (!contact) return { ok: false, reason: `Contact ${id} not found` };
 
-  if (contact.status === "sent" || contact.status === "coffee_chatted") {
+  if (
+    contact.status === "sent" ||
+    contact.status === "coffee_chatted" ||
+    contact.status === "no_response"
+  ) {
     return {
       ok: false,
       reason: `${contact.name} is already marked "${contact.status}" — refusing to re-send to avoid duplicate outreach.`,
@@ -183,7 +187,7 @@ export function markSent(id: number): { ok: true; contact: Contact } | { ok: fal
   if (contact.linkedin_url) {
     const dupe = db
       .prepare(
-        `SELECT * FROM contacts WHERE linkedin_url = ? AND id != ? AND status IN ('sent', 'coffee_chatted')`
+        `SELECT * FROM contacts WHERE linkedin_url = ? AND id != ? AND status IN ('sent', 'coffee_chatted', 'no_response')`
       )
       .get(contact.linkedin_url, id) as Contact | undefined;
     if (dupe) {
@@ -212,6 +216,26 @@ export function findContactsByName(name: string): Contact[] {
   return db
     .prepare(`SELECT * FROM contacts WHERE name = ? COLLATE NOCASE`)
     .all(name.trim()) as Contact[];
+}
+
+/**
+ * Duplicate-outreach lookup: other contact records (excluding excludeId) matching by
+ * exact linkedin_url or case-insensitive name, restricted to statuses that represent
+ * real prior outreach (sent/coffee_chatted/no_response) — not_contacted/drafted matches
+ * aren't a duplicate-outreach risk and are excluded.
+ */
+export function findPotentialDuplicates(
+  name: string,
+  linkedin_url: string | null | undefined,
+  excludeId?: number
+): Contact[] {
+  const CONTACTED: ContactStatus[] = ["sent", "coffee_chatted", "no_response"];
+  const byName = findContactsByName(name);
+  const byUrl = linkedin_url ? [findContactByLinkedInUrl(linkedin_url)].filter((c): c is Contact => !!c) : [];
+  const merged = new Map<number, Contact>();
+  for (const c of [...byName, ...byUrl]) merged.set(c.id, c);
+  if (excludeId !== undefined) merged.delete(excludeId);
+  return [...merged.values()].filter((c) => CONTACTED.includes(c.status));
 }
 
 /**

@@ -40,11 +40,10 @@
  * email-drafts list-for-contact <contactId>
  * email-drafts add '<json NewEmailDraft>'
  *
+ * email-draft-chat list-for-contact <contactId>
+ *
  * discovery-preferences get
  * discovery-preferences set '<json {target_schools?, require_connection?, exclude_recruiters?, notes?}>'
- *
- * resume get
- * resume set '<json {raw_text, filename?}>'
  */
 import {
   listContacts,
@@ -74,7 +73,6 @@ import {
   dismissSuggestedContact,
 } from "../lib/db/suggestedContacts";
 import { getDiscoveryPreferences, updateDiscoveryPreferences } from "../lib/db/discoveryPreferences";
-import { getResume, setResume } from "../lib/db/resume";
 import {
   listSuggestedApplications,
   listAllSuggestedApplicationKeys,
@@ -83,6 +81,7 @@ import {
   dismissSuggestedApplication,
 } from "../lib/db/suggestedApplications";
 import { listDraftsForContact, insertEmailDraft } from "../lib/db/emailDrafts";
+import { listDraftChatMessages } from "../lib/db/emailDraftChat";
 import type {
   ApplicationStatus,
   ConnectionStatus,
@@ -286,6 +285,11 @@ switch (`${resource} ${action}`) {
     break;
   }
 
+  case "email-draft-chat list-for-contact": {
+    out(listDraftChatMessages(Number(args[0])));
+    break;
+  }
+
   case "discovery-preferences get": {
     const p = getDiscoveryPreferences();
     out({ ...p, target_schools: JSON.parse(p.target_schools) });
@@ -295,18 +299,6 @@ switch (`${resource} ${action}`) {
     const payload = JSON.parse(args[0] ?? "{}");
     const p = updateDiscoveryPreferences(payload);
     out({ ...p, target_schools: JSON.parse(p.target_schools) });
-    break;
-  }
-
-  case "resume get": {
-    const r = getResume();
-    out(r ? { ...r, keywords: JSON.parse(r.keywords) } : null);
-    break;
-  }
-  case "resume set": {
-    const payload = JSON.parse(args[0] ?? "{}");
-    const r = setResume(payload);
-    out({ ...r, keywords: JSON.parse(r.keywords) });
     break;
   }
 

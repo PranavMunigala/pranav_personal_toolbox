@@ -146,14 +146,6 @@ export interface InternshipFilterSettings {
   updated_at: string;
 }
 
-export interface Resume {
-  id: 1;
-  raw_text: string | null;
-  keywords: string; // JSON-encoded string[]
-  filename: string | null;
-  uploaded_at: string | null;
-}
-
 export type ResearchChatRole = "user" | "assistant";
 
 export interface ResearchChatMessage {
@@ -162,5 +154,16 @@ export interface ResearchChatMessage {
   slug: string;
   role: ResearchChatRole;
   content: string;
+  created_at: string;
+}
+
+export type EmailDraftChatRole = "user" | "assistant";
+
+export interface EmailDraftChatMessage {
+  id: number;
+  contact_id: number;
+  role: EmailDraftChatRole;
+  content: string;
+  resulting_draft_id: number | null;
   created_at: string;
 }

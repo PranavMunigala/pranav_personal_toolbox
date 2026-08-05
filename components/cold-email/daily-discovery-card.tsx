@@ -38,8 +38,8 @@ export function DailyDiscoveryCard({
       <CardHeader>
         <CardTitle>Daily discovery</CardTitle>
         <CardDescription>
-          A broader, general sweep off your resume and preferences alone (no custom
-          query) — up to 5 new people. Limited to once a day to keep search costs in
+          A broader, general sweep off your preferences and existing contacts alone (no
+          custom query) — up to 5 new people. Limited to once a day to keep search costs in
           check; use &quot;Run contact discovery&quot; above for specific searches,
           which has no daily limit.
         </CardDescription>

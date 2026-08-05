@@ -47,8 +47,8 @@ export function SuggestedContactsCard({
       <CardHeader>
         <CardTitle>Suggested contacts{batchDate ? ` — ${batchDate}` : ""}</CardTitle>
         <CardDescription>
-          Candidates found by the contact-discovery skill, matched against your resume
-          and targeting preferences. Review before adding — nothing here is emailed
+          Candidates found by the contact-discovery skill, matched against your
+          targeting preferences and existing contacts. Review before adding — nothing here is emailed
           automatically.
         </CardDescription>
       </CardHeader>

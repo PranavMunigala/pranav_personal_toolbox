@@ -37,7 +37,8 @@ export function RunDiscoveryCard() {
         <CardDescription>
           For specific searches — describe who you&apos;re looking for this run (e.g.
           &quot;Rutgers alumni doing ML in biotech, not recruiters&quot;). Searches the web for up
-          to 3 new people matching that plus your resume/preferences above. Run as many
+          to 3 new people matching that plus your preferences and existing contacts
+          above. Run as many
           times as you want — results land in Suggested contacts below for you to
           review; nothing is added to your tracker automatically. A run can take
           10–30 seconds.

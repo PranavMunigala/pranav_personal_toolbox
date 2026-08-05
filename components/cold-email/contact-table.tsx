@@ -34,15 +34,24 @@ const STATUS_OPTIONS: ContactStatus[] = [
 
 export function ContactTable({ contacts }: { contacts: Contact[] }) {
   const [query, setQuery] = useState("");
+  const [showNoResponse, setShowNoResponse] = useState(false);
   const [isPending, startTransition] = useTransition();
 
+  const noResponseCount = useMemo(
+    () => contacts.filter((c) => c.status === "no_response").length,
+    [contacts]
+  );
+
   const filtered = useMemo(() => {
+    const visible = showNoResponse
+      ? contacts
+      : contacts.filter((c) => c.status !== "no_response");
     const q = query.trim().toLowerCase();
-    if (!q) return contacts;
-    return contacts.filter((c) =>
+    if (!q) return visible;
+    return visible.filter((c) =>
       [c.name, c.company, c.title].filter(Boolean).join(" ").toLowerCase().includes(q)
     );
-  }, [contacts, query]);
+  }, [contacts, query, showNoResponse]);
 
   function changeStatus(id: number, status: ContactStatus) {
     startTransition(async () => {
@@ -61,12 +70,26 @@ export function ContactTable({ contacts }: { contacts: Contact[] }) {
 
   return (
     <div className="space-y-3">
-      <Input
-        placeholder="Search by name, company, title..."
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        className="max-w-sm"
-      />
+      <div className="flex items-center gap-3">
+        <Input
+          placeholder="Search by name, company, title..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          className="max-w-sm"
+        />
+        {noResponseCount > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => setShowNoResponse((v) => !v)}
+          >
+            {showNoResponse
+              ? "Hide no-response contacts"
+              : `Show ${noResponseCount} no-response contact${noResponseCount === 1 ? "" : "s"}`}
+          </Button>
+        )}
+      </div>
       <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>

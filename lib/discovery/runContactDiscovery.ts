@@ -1,6 +1,6 @@
 import { getPreferences } from "@/lib/db/preferences";
 import { getDiscoveryPreferences, touchDiscoveryRunTimestamp } from "@/lib/db/discoveryPreferences";
-import { getResume } from "@/lib/db/resume";
+import { listContacts } from "@/lib/db/contacts";
 import { listSuggestedContacts } from "@/lib/db/suggestedContacts";
 import { runSkill } from "@/lib/claudeCode/runSkill";
 import type { SuggestedContact } from "@/lib/db/types";
@@ -8,7 +8,7 @@ import type { SuggestedContact } from "@/lib/db/types";
 // "Specific" discovery (customQuery-driven, from the Run Contact Discovery card) can be
 // run as many times as the user likes, but returns at most 3 per run.
 const SPECIFIC_MAX_CANDIDATES = 3;
-// "Daily" discovery (general sweep off resume+preferences alone) is broader — up to 5 —
+// "Daily" discovery (general sweep off preferences+existing contacts alone) is broader — up to 5 —
 // but gated to once per 24h so it can't be spammed for cost reasons.
 const DAILY_MAX_CANDIDATES = 5;
 const RUN_COOLDOWN_MS = 24 * 60 * 60 * 1000;
@@ -52,19 +52,18 @@ async function runDiscoveryCore(
   // nothing to match against — mirrors the original OpenRouter-era check.
   const preferences = getPreferences();
   const discoveryPreferences = getDiscoveryPreferences();
-  const resume = getResume();
   const industries = JSON.parse(preferences.industries) as string[];
   const roles = JSON.parse(preferences.roles) as string[];
-  const resumeKeywords = resume ? (JSON.parse(resume.keywords) as string[]) : [];
+  const hasExistingContacts = listContacts().length > 0;
   if (
     industries.length === 0 &&
     roles.length === 0 &&
-    resumeKeywords.length === 0 &&
     !discoveryPreferences.notes &&
-    !customQuery?.trim()
+    !customQuery?.trim() &&
+    !hasExistingContacts
   ) {
     throw new Error(
-      "Nothing to match against yet — upload a resume, set preferences, or describe who you're looking for."
+      "Nothing to match against yet — set preferences, add a contact, or describe who you're looking for."
     );
   }
 
@@ -105,7 +104,7 @@ export async function runContactDiscovery(customQuery?: string): Promise<Discove
 }
 
 /**
- * General daily sweep — off resume+preferences alone, no custom query. Gated to once per
+ * General daily sweep — off preferences+existing contacts alone, no custom query. Gated to once per
  * 24h (checked and stamped here); capped at 5 results.
  */
 export async function runDailyDiscovery(): Promise<DiscoveryRunResult> {

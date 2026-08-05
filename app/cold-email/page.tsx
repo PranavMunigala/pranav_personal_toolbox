@@ -1,14 +1,12 @@
 import { listContacts, applyNoResponseAging } from "@/lib/db/contacts";
 import { getPreferences } from "@/lib/db/preferences";
 import { getDiscoveryPreferences } from "@/lib/db/discoveryPreferences";
-import { getResume } from "@/lib/db/resume";
 import { listSuggestedContacts, latestBatchDate } from "@/lib/db/suggestedContacts";
 import { SuggestedContactsCard } from "@/components/cold-email/suggested-contacts-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ContactTable } from "@/components/cold-email/contact-table";
 import { AddContactDialog } from "@/components/cold-email/add-contact-dialog";
 import { PreferencesCard } from "@/components/cold-email/preferences-card";
-import { ResumeCard } from "@/components/cold-email/resume-card";
 import { DiscoveryPreferencesCard } from "@/components/cold-email/discovery-preferences-card";
 import { RunDiscoveryCard } from "@/components/cold-email/run-discovery-card";
 import { DailyDiscoveryCard } from "@/components/cold-email/daily-discovery-card";
@@ -23,7 +21,6 @@ export default async function ColdEmailPage() {
   const allContacts = listContacts();
   const preferences = getPreferences();
   const discoveryPreferences = getDiscoveryPreferences();
-  const resume = getResume();
   const suggestions = listSuggestedContacts();
   const suggestionsBatchDate = latestBatchDate();
 
@@ -55,35 +52,31 @@ export default async function ColdEmailPage() {
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground space-y-1.5">
           <p>
-            <strong className="text-foreground">1. Paste or upload your resume</strong> below —
-            it&apos;s parsed locally into keywords and used as a match signal for discovery.
-          </p>
-          <p>
-            <strong className="text-foreground">2. Set preferences and discovery filters</strong> —
+            <strong className="text-foreground">1. Set preferences and discovery filters</strong> —
             target industries/roles, schools, connection requirements, and any standing
             context you want every discovery run to consider.
           </p>
           <p>
-            <strong className="text-foreground">3. Run discovery</strong> — &quot;Run
+            <strong className="text-foreground">2. Run discovery</strong> — &quot;Run
             contact discovery&quot; below is for specific searches (describe who you
             want, run as often as you like, up to 3 results each time);
             &quot;Daily discovery&quot; is a broader general sweep off your
-            resume/preferences alone, limited to once a day, up to 5 results. Both
-            write candidates to Suggested contacts for review — neither adds anyone to
-            your tracker automatically.
+            preferences and existing contacts alone, limited to once a day, up to 5
+            results. Both write candidates to Suggested contacts for review — neither
+            adds anyone to your tracker automatically.
           </p>
           <p>
-            <strong className="text-foreground">4. Review suggestions</strong> — each one shows
+            <strong className="text-foreground">3. Review suggestions</strong> — each one shows
             their LinkedIn link, company/title, and a short note on why they matched. Add
             promotes them to your tracker (through the same dedup guard as everywhere else)
             and automatically drafts an outreach email for them; Dismiss discards them.
           </p>
           <p>
-            <strong className="text-foreground">5. Track outreach</strong> — the table below
+            <strong className="text-foreground">4. Track outreach</strong> — the table below
             lists every contact and its status (contacts sitting in &quot;sent&quot; for 30+
-            days with no reply automatically move to &quot;no response&quot;); use the
-            keyword search to narrow it down, and click a row to edit details or view/draft
-            an email.
+            days with no reply automatically move to &quot;no response&quot; and are hidden
+            from the table by default); use the keyword search to narrow it down, and click
+            a row to edit details or view/draft an email.
           </p>
         </CardContent>
       </Card>
@@ -108,12 +101,6 @@ export default async function ColdEmailPage() {
           notes={discoveryPreferences.notes}
         />
       </div>
-
-      <ResumeCard
-        filename={resume?.filename ?? null}
-        uploadedAt={resume?.uploaded_at ?? null}
-        keywordCount={resume ? (JSON.parse(resume.keywords) as string[]).length : 0}
-      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <RunDiscoveryCard />

@@ -89,7 +89,13 @@ now go through the exact same skill instructions.
   as its own section on `/cold-email`) — all added via a `PRAGMA table_info`-based
   migration guard in `lib/db/index.ts` (SQLite has no
   `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`).
-- **email_drafts** — history of generated drafts per contact.
+- **email_drafts** — append-only version history of generated drafts per contact; each
+  refinement via the "Refine this draft" chat box on a contact's detail page creates a
+  new row rather than editing in place.
+- **email_draft_chat_messages** — chat turns for the refine box, scoped by `contact_id`
+  (`lib/db/emailDraftChat.ts`); `resulting_draft_id` links an assistant turn to the
+  `email_drafts` row it produced, null on refusal. The skill never writes either table
+  directly — `app/cold-email/actions.ts::refineEmailDraftAction` persists both sides.
 - **applications** — `status` (`applied`/`oa`/`interview`/`follow_up`/`offer`/`rejected`),
   plus `interview_contact_name`/`interview_contact_email` (whoever reaches out to
   schedule an interview — plain fields, not linked to `contacts`).
@@ -114,8 +120,8 @@ now go through the exact same skill instructions.
   context), `last_discovery_run_at` — narrows/rate-limits what discovery searches for.
   Two run modes from `lib/discovery/runContactDiscovery.ts`: `runContactDiscovery()` is
   the specific/ad-hoc search (unlimited runs/day, caps at 3 results) and
-  `runDailyDiscovery()` is the general sweep off resume+preferences alone (once per day,
-  caps at 5 results, gated by `last_discovery_run_at`).
+  `runDailyDiscovery()` is the general sweep off preferences and existing contacts alone
+  (once per day, caps at 5 results, gated by `last_discovery_run_at`).
 - **suggested_applications** — postings found by internship search, pending human review
   (same `pending`/`added`/`dismissed` shape as `suggested_contacts`), plus a
   `filter_failures` column (JSON array of reason strings; always null today — see below,
@@ -170,20 +176,18 @@ now go through the exact same skill instructions.
   (`lib/db/internshipFilterSettings.ts::getInternshipFilterSettings`), so edits made on
   the `/internships` "Filters" tab apply live with no restart. Live posting verification
   is never part of this table — it's not a toggleable rule.
-- **resume** — single row (id=1): `raw_text` + locally-extracted `keywords` (no LLM
-  call), used as a match signal for both contact discovery and internship search.
 
 Access this data two ways:
 - From the Next.js app: `lib/db/contacts.ts`, `lib/db/applications.ts`,
   `lib/db/targetCompanies.ts`, `lib/db/preferences.ts`, `lib/db/suggestedContacts.ts`,
   `lib/db/suggestedApplications.ts`, `lib/db/discoveryPreferences.ts`,
-  `lib/db/internshipFilterSettings.ts`, `lib/db/resume.ts`.
+  `lib/db/internshipFilterSettings.ts`.
 - From a skill/script: `npx tsx scripts/db-cli.ts <resource> <action> [args]` — a thin
   CLI over the same functions, so skills never write raw SQL and always go through the
   dedup guard. Resources: `contacts`, `applications`, `target-companies`, `preferences`,
-  `suggested-contacts`, `suggested-applications`, `email-drafts`, `discovery-preferences`,
-  `resume`. This is also how headlessly-invoked skills (via `runSkill()`) persist
-  everything they find/draft — see "AI provider" above.
+  `suggested-contacts`, `suggested-applications`, `email-drafts`, `discovery-preferences`.
+  This is also how headlessly-invoked skills (via `runSkill()`) persist everything they
+  find/draft — see "AI provider" above.
 
 ## The dedup guard (critical — do not bypass)
 
@@ -213,11 +217,14 @@ a second way to set `status = 'sent'` that skips it.
   to reach out to or follow up with next. Interactive-only, not invoked headlessly by
   the app.
 - `contact-discovery` — WebSearches for new people (biomedical AI/medical
-  devices/informatics) matching resume + targeting/discovery preferences; writes
-  candidates to `suggested_contacts` for review on `/cold-email`, never directly into
-  `contacts`. On-demand only, no scraping/enrichment API. Invoked both interactively and
-  headlessly by `lib/discovery/runContactDiscovery.ts::runContactDiscovery()`/
-  `runDailyDiscovery()`.
+  devices/informatics) matching targeting/discovery preferences and the mix of
+  companies/people already in the tracker (existing `contacts` as a steering signal, not
+  just dedup — deliberately spread across healthcare AI companies, biomedical/health-tech
+  startups, established medtech/pharma, and school alumni, rather than biasing toward any
+  one category); writes candidates to `suggested_contacts` for review on `/cold-email`,
+  never directly into `contacts`. On-demand only, no scraping/enrichment API. Invoked both
+  interactively and headlessly by
+  `lib/discovery/runContactDiscovery.ts::runContactDiscovery()`/`runDailyDiscovery()`.
 - `contact-enrichment` — given a list of existing contact names, WebSearches each and
   fills only missing `linkedin_url`/`alma_mater`/`industry_tags` fields, never
   overwrites or creates. Invoked headlessly by

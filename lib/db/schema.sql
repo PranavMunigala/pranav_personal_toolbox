@@ -28,6 +28,22 @@ CREATE TABLE IF NOT EXISTS email_drafts (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- Chat turns for the "refine this draft" box on a contact's detail page. Scoped by
+-- contact_id (there's one running conversation per contact, not per draft) since each
+-- refinement replaces "the latest draft" with a new email_drafts row rather than
+-- editing in place. resulting_draft_id links an assistant turn to the draft version it
+-- produced (null if the turn was a refusal).
+CREATE TABLE IF NOT EXISTS email_draft_chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  resulting_draft_id INTEGER REFERENCES email_drafts(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_email_draft_chat_messages_contact ON email_draft_chat_messages(contact_id);
+
 CREATE TABLE IF NOT EXISTS applications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   company TEXT NOT NULL,
@@ -92,14 +108,6 @@ CREATE TABLE IF NOT EXISTS discovery_preferences (
   exclude_recruiters INTEGER NOT NULL DEFAULT 0,
   notes TEXT,
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE TABLE IF NOT EXISTS resume (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
-  raw_text TEXT,
-  keywords TEXT NOT NULL DEFAULT '[]', -- JSON array, extracted locally (no LLM call)
-  filename TEXT,
-  uploaded_at TEXT
 );
 
 -- Candidate postings found by internship search (daily target-company refresh or a

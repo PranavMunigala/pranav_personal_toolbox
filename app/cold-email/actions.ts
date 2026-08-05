@@ -8,14 +8,18 @@ import {
   updateContact,
   deleteContact,
   findContactByLinkedInUrl,
+  findPotentialDuplicates,
+  getContact,
 } from "@/lib/db/contacts";
 import { updatePreferences } from "@/lib/db/preferences";
 import { updateDiscoveryPreferences } from "@/lib/db/discoveryPreferences";
-import { setResume } from "@/lib/db/resume";
 import { promoteSuggestedContact, dismissSuggestedContact } from "@/lib/db/suggestedContacts";
 import { runContactDiscovery, runDailyDiscovery } from "@/lib/discovery/runContactDiscovery";
 import { enrichContacts } from "@/lib/discovery/enrichContacts";
 import { draftEmailForContact } from "@/lib/email/draftEmail";
+import { refineEmailDraft } from "@/lib/email/refineEmailDraft";
+import { listDraftsForContact, insertEmailDraft } from "@/lib/db/emailDrafts";
+import { listDraftChatMessages, addDraftChatMessage } from "@/lib/db/emailDraftChat";
 import type { ConnectionStatus, ContactStatus, RequireConnection, SeniorityTier } from "@/lib/db/types";
 
 export interface ActionResult {
@@ -45,6 +49,14 @@ export async function createContactAction(input: {
         message: `${existing.name} is already in the tracker with this LinkedIn URL (status: ${existing.status}).`,
       };
     }
+  }
+
+  const dupe = findPotentialDuplicates(input.name, input.linkedin_url)[0];
+  if (dupe) {
+    return {
+      ok: false,
+      message: `${dupe.name} already exists with status "${dupe.status}"${dupe.company ? ` at ${dupe.company}` : ""} — refusing to add a likely duplicate.`,
+    };
   }
 
   insertContact({
@@ -179,17 +191,6 @@ export async function runDailyDiscoveryAction(): Promise<ActionResult> {
   }
 }
 
-export async function uploadResumeAction(input: {
-  raw_text: string;
-  filename?: string;
-}): Promise<ActionResult> {
-  if (!input.raw_text.trim()) return { ok: false, message: "Resume text is empty." };
-  const resume = setResume(input);
-  revalidatePath("/cold-email");
-  const keywordCount = (JSON.parse(resume.keywords) as string[]).length;
-  return { ok: true, message: `Resume saved (${keywordCount} keywords extracted).` };
-}
-
 export async function promoteSuggestedContactAction(id: number): Promise<ActionResult> {
   const result = promoteSuggestedContact(id);
   if (!result.ok) return { ok: false, message: result.reason };
@@ -246,5 +247,66 @@ export async function draftEmailAction(contactId: number): Promise<ActionResult>
     return { ok: true, message: "Draft ready." };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Drafting failed." };
+  }
+}
+
+export interface RefineEmailDraftResult {
+  ok: boolean;
+  note?: string;
+  error?: string;
+}
+
+export async function refineEmailDraftAction(
+  contactId: number,
+  message: string
+): Promise<RefineEmailDraftResult> {
+  const trimmed = message.trim();
+  if (!trimmed) return { ok: false, error: "Enter a message first." };
+
+  const contact = getContact(contactId);
+  if (!contact) return { ok: false, error: "Contact not found." };
+
+  const drafts = listDraftsForContact(contactId);
+  const latest = drafts[0];
+  if (!latest) return { ok: false, error: "Draft this email first, then refine it." };
+
+  try {
+    const history = listDraftChatMessages(contactId).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const result = await refineEmailDraft(
+      contactId,
+      latest.subject,
+      latest.body,
+      history,
+      trimmed
+    );
+
+    addDraftChatMessage(contactId, "user", trimmed);
+
+    if (!result.ok || !result.subject || !result.body) {
+      const error = result.refusal_reason ?? "Couldn't refine the draft.";
+      addDraftChatMessage(contactId, "assistant", error);
+      return { ok: false, error };
+    }
+
+    const newDraft = insertEmailDraft({
+      contact_id: contactId,
+      subject: result.subject,
+      body: result.body,
+      seniority_tier_used: latest.seniority_tier_used,
+    });
+
+    const note = result.note ?? "Draft updated.";
+    addDraftChatMessage(contactId, "assistant", note, newDraft.id);
+
+    revalidatePath(`/cold-email/${contactId}`);
+    return { ok: true, note };
+  } catch (err) {
+    const error = err instanceof Error ? err.message : "Refine failed.";
+    addDraftChatMessage(contactId, "assistant", error);
+    return { ok: false, error };
   }
 }

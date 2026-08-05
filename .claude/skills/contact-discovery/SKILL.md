@@ -1,12 +1,13 @@
 ---
 name: contact-discovery
-description: Use when the user wants to find new potential outreach contacts (people, not companies/internships) in biomedical AI/medical devices/informatics matching their resume and targeting criteria — on demand only, never scheduled. Writes candidates to a review queue for the user to approve before they become tracked contacts.
+description: Use when the user wants to find new potential outreach contacts (people, not companies/internships) in biomedical AI/medical devices/informatics matching their targeting criteria — on demand only, never scheduled. Writes candidates to a review queue for the user to approve before they become tracked contacts.
 ---
 
 # Contact discovery
 
 Finds new people to reach out to, matching the user's preferences, discovery filters,
-and resume, via WebSearch only. Writes suggestions to a review queue
+and the mix of companies/people already in their tracker, via WebSearch only. Writes
+suggestions to a review queue
 (`suggested_contacts`) — never directly into `contacts`. The user reviews and adds them
 from the "Suggested contacts" card on `/cold-email`, or via `suggested-contacts promote`
 below.
@@ -17,31 +18,37 @@ below.
    ```
    npx tsx scripts/db-cli.ts preferences get
    npx tsx scripts/db-cli.ts discovery-preferences get
-   npx tsx scripts/db-cli.ts resume get
    npx tsx scripts/db-cli.ts contacts list
    npx tsx scripts/db-cli.ts suggested-contacts list
    ```
-   Use `preferences.industries`/`roles` for subject-matter targeting,
+   Use `preferences.industries`/`roles` for subject-matter targeting and
    `discovery-preferences` for narrowing (`target_schools`, `require_connection`,
-   `exclude_recruiters`), and `resume.keywords` as additional signal for
-   `match_reasons`. If `resume get` returns `null`, note that matching will be based on
-   preferences alone and tell the user a resume upload (on `/cold-email`) would sharpen
-   results.
+   `exclude_recruiters`, `notes`).
 
-   Build the dedup set from `contacts list` (by `linkedin_url`, case-insensitively) and
-   `suggested-contacts list` (recent pending/added suggestions, also by `linkedin_url`)
-   so you never re-suggest someone already tracked or already queued.
+   `contacts list` serves two purposes here, not just dedup:
+   - **Dedup set**: build it by `linkedin_url`, case-insensitively, combined with
+     `suggested-contacts list` (recent pending/added suggestions, also by
+     `linkedin_url`) so you never re-suggest someone already tracked or queued.
+   - **Signal**: scan the existing contacts' `company`, `title`, `industry_tags`, and
+     `profile_text` to get a rough read on the mix already being pursued — e.g. mostly
+     large pharma vs. mostly startups, mostly one school vs. a spread. Use this to steer
+     toward a broader, more varied batch rather than repeating whatever pattern already
+     dominates the tracker.
 
 2. **Search with WebSearch** for people — not companies or job postings — at the
    intersection of the user's target industries/roles (e.g. AI applied to healthcare,
-   biomedical engineering, medical devices, health informatics, bioinformatics) and
-   their resume keywords. Rely on public web-search snippets only (e.g. what a search
+   biomedical engineering, medical devices, health informatics, bioinformatics) and the
+   mix inferred in step 1. Rely on public web-search snippets only (e.g. what a search
    engine surfaces about a public LinkedIn profile, company team pages, published
    author bios) — never fetch or log into LinkedIn directly, and never attempt to
    scrape a page that requires authentication.
-   - If `target_schools` is set in discovery preferences, bias searches toward alumni
-     of those schools working in the target field (e.g. `"Rutgers" biomedical AI
-     LinkedIn`).
+   - Deliberately search across several categories in the same run rather than letting
+     one dominate: people at **healthcare AI companies**, people at **biomedical/
+     health-tech startups**, people at **established medtech/pharma companies**, and —
+     if `target_schools` is set — alumni of those schools working in the target field
+     (e.g. `"Rutgers" biomedical AI LinkedIn`). School alumni are one useful signal
+     among several, not the default bias; mix categories across the batch of results
+     instead of returning an all-alumni or all-one-company-type list.
    - If `require_connection` is `connected_only` or `not_connected_only`: say plainly
      that WebSearch cannot determine actual LinkedIn connection status, and skip that
      filter rather than guessing — do not mark anyone `connected` without evidence.
@@ -78,7 +85,7 @@ below.
 When invoked headlessly (`claude -p /contact-discovery ...` from the app's
 `runContactDiscovery()`/`runDailyDiscovery()`, not an interactive session), the prompt
 gives you `max_candidates` (cap for step 4) and optionally a `custom_query` string to
-fold into your search terms alongside preferences/resume signal. Follow steps 1–5
+fold into your search terms alongside preferences/contact-history signal. Follow steps 1–5
 exactly as above (still write via `suggested-contacts add`), but skip step 6's
 user-facing report — instead return only the final JSON result `{"addedCount": <number
 of suggestions you wrote>, "note": "<one sentence on how the search went>"}`, no

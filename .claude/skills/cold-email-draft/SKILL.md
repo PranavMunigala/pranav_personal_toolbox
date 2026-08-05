@@ -122,6 +122,57 @@ When invoked headlessly (`claude -p /cold-email-draft ...` from the app's
    does that itself with the returned fields).
 5. Return only the final JSON result — no surrounding prose.
 
+## Automated invocation — chat (refine an existing draft)
+
+When invoked headlessly with `mode: chat` (from `refineEmailDraft()`, backing the
+"Refine this draft" chat box under a contact's drafts on `/cold-email/[id]`), the
+prompt gives you `contact_id`, the `current_subject`/`current_body` of the contact's
+most recent draft, prior `history` (an array of `{role, content}` chat turns for this
+contact), and a new `message` from the user.
+
+1. Look up the contact via `npx tsx scripts/db-cli.ts contacts get <contact_id>` to
+   re-confirm current `status` and pull profile fields. Still enforce the dedup guard:
+   if `status` is `sent` or `coffee_chatted`, refuse — return `{"ok": false,
+   "refusal_reason": "<why>", "subject": null, "body": null, "note": null}` — rather
+   than producing a "refined" draft for someone already contacted since the page
+   loaded.
+
+2. Interpret `message` as one of:
+   - **Added context** ("she went to Rutgers too", "mention I saw her podcast
+     appearance") — fold the new fact into the existing draft, don't restart from
+     scratch.
+   - **An edit request** ("make it shorter", "less formal", "ask for a referral
+     instead of a coffee chat") — apply the edit directly to
+     `current_subject`/`current_body`.
+   - **A pasted reference email** (the user pasted an example email's text into
+     `message`) — restyle voice/structure/length to resemble it while keeping the
+     sign-off block, factual-grounding rules, and per-tier tone constraints from the
+     main drafting steps above.
+   - **A pasted URL** (a bare URL, or a URL alongside text, in `message`) — WebFetch it
+     (e.g. a company "about" page, the recipient's team page, a blog post) and use only
+     verifiable facts from the fetched content to adjust framing — never fabricate
+     beyond what's fetched. Use WebSearch only if the fetch fails or more context is
+     needed to understand the fetched page.
+
+3. Regardless of which case, still honor every rule from the main drafting steps: stay
+   under ~120 words, keep the tone-by-seniority-tier calibration for this contact's
+   `seniority_tier`, end with the exact sign-off block verbatim, never fabricate facts,
+   plain ASCII punctuation only.
+
+4. This mode never touches contact `status` and never sends anything. It only produces
+   revised `subject`/`body` text for the caller to persist as a new `email_drafts` row
+   — do not call `set-status` or any send-related tool.
+
+5. Return exactly:
+   `{"ok": true, "refusal_reason": null, "subject": "...", "body": "...", "note": "one
+   short sentence describing what changed, e.g. 'Shortened it and added a mention of
+   her Rutgers background.'"}`
+   or, if refusing per step 1:
+   `{"ok": false, "refusal_reason": "<why>", "subject": null, "body": null, "note":
+   null}`
+
+6. Return only the final JSON result — no surrounding prose.
+
 ## "Who should I reach out to next" mode
 
 If asked for suggestions rather than a specific contact, run:

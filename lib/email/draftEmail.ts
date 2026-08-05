@@ -1,4 +1,4 @@
-import { getContact } from "@/lib/db/contacts";
+import { getContact, findPotentialDuplicates } from "@/lib/db/contacts";
 import { insertEmailDraft } from "@/lib/db/emailDrafts";
 import { runSkill } from "@/lib/claudeCode/runSkill";
 import type { EmailDraft } from "@/lib/db/types";
@@ -26,6 +26,13 @@ const DRAFT_SCHEMA = {
 export async function draftEmailForContact(contactId: number): Promise<EmailDraft> {
   const contact = getContact(contactId);
   if (!contact) throw new Error(`Contact ${contactId} not found`);
+
+  const dupe = findPotentialDuplicates(contact.name, contact.linkedin_url, contact.id)[0];
+  if (dupe) {
+    throw new Error(
+      `Another contact record for ${contact.name} (id ${dupe.id}, status ${dupe.status}) already exists — check /cold-email/${dupe.id} before drafting again.`
+    );
+  }
 
   const prompt = `This is a headless/automated invocation. contact_id: ${contactId}. Look up the contact yourself per the "Automated invocation" section, then draft a short cold-outreach email asking this person for a coffee chat or brief call. I'm a biomedical engineering / computer science student networking into engineering roles. Ground every claim strictly in facts from their stored profile; never invent shared connections, achievements, or background details.
 
