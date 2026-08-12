@@ -21,7 +21,7 @@ import {
 import { CommuteTierBadge } from "./application-status-badge";
 import { addTargetCompanyAction, removeTargetCompanyAction } from "@/app/internships/actions";
 import type { TargetCompany, CommuteTier } from "@/lib/db/types";
-import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink, X } from "lucide-react";
 
 const TIER_ORDER: CommuteTier[] = ["under_30", "30_45", "45_60", "60_75"];
 const TIER_LABEL: Record<CommuteTier, string> = {
@@ -37,6 +37,7 @@ export function TargetCompaniesCard({ companies }: { companies: TargetCompany[] 
   const [name, setName] = useState("");
   const [location, setLocation] = useState("");
   const [tier, setTier] = useState<CommuteTier>("under_30");
+  const [careersUrl, setCareersUrl] = useState("");
 
   const byTier = TIER_ORDER.map((t) => ({
     tier: t,
@@ -49,6 +50,7 @@ export function TargetCompaniesCard({ companies }: { companies: TargetCompany[] 
         name,
         location: location || undefined,
         commute_tier: tier,
+        careers_url: careersUrl || undefined,
       });
       if (!result.ok) {
         toast.error(result.message);
@@ -57,6 +59,7 @@ export function TargetCompaniesCard({ companies }: { companies: TargetCompany[] 
       toast.success(result.message);
       setName("");
       setLocation("");
+      setCareersUrl("");
     });
   }
 
@@ -102,6 +105,14 @@ export function TargetCompaniesCard({ companies }: { companies: TargetCompany[] 
                 onChange={(e) => setLocation(e.target.value)}
               />
             </div>
+            <div className="space-y-1.5">
+              <Input
+                placeholder="Careers/ATS URL (optional)"
+                className="w-48"
+                value={careersUrl}
+                onChange={(e) => setCareersUrl(e.target.value)}
+              />
+            </div>
             <Select value={tier} onValueChange={(v) => setTier(v as CommuteTier)}>
               <SelectTrigger className="w-32">
                 <SelectValue />
@@ -129,7 +140,19 @@ export function TargetCompaniesCard({ companies }: { companies: TargetCompany[] 
                     className="rounded-md border px-3 py-2 text-sm flex items-start justify-between gap-2"
                   >
                     <div>
-                      <div className="font-medium">{c.name}</div>
+                      <div className="font-medium flex items-center gap-1.5">
+                        {c.name}
+                        {c.careers_url && (
+                          <a
+                            href={c.careers_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <ExternalLink className="size-3.5" />
+                          </a>
+                        )}
+                      </div>
                       <div className="text-muted-foreground text-xs">{c.location}</div>
                     </div>
                     <Button

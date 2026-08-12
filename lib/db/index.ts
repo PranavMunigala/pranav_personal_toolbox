@@ -53,6 +53,12 @@ const PREFERENCES_NEW_COLUMNS: Record<string, string> = {
 
 const SUGGESTED_APPLICATIONS_NEW_COLUMNS: Record<string, string> = {
   filter_failures: "TEXT", // JSON array of reason strings; null if it passed all enabled filters
+  verification_status:
+    "TEXT NOT NULL DEFAULT 'confirmed' CHECK (verification_status IN ('confirmed', 'plausible'))",
+};
+
+const TARGET_COMPANIES_NEW_COLUMNS: Record<string, string> = {
+  careers_url: "TEXT", // known-good direct ATS/job-board link, used by internship-search to fetch directly
 };
 
 function createConnection(): Database.Database {
@@ -67,6 +73,7 @@ function createConnection(): Database.Database {
   addMissingColumns(db, "applications", APPLICATIONS_NEW_COLUMNS);
   addMissingColumns(db, "preferences", PREFERENCES_NEW_COLUMNS);
   addMissingColumns(db, "suggested_applications", SUGGESTED_APPLICATIONS_NEW_COLUMNS);
+  addMissingColumns(db, "target_companies", TARGET_COMPANIES_NEW_COLUMNS);
   return db;
 }
 

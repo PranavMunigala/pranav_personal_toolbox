@@ -66,6 +66,7 @@ export interface TargetCompany {
   location: string | null;
   commute_tier: CommuteTier;
   notes: string | null;
+  careers_url: string | null; // known-good direct ATS/job-board link
 }
 
 export interface Preferences {
@@ -117,6 +118,8 @@ export interface DiscoveryPreferences {
 
 export type SuggestedApplicationStatus = "pending" | "added" | "dismissed";
 
+export type SuggestedApplicationVerificationStatus = "confirmed" | "plausible";
+
 export interface SuggestedApplication {
   id: number;
   company: string;
@@ -131,6 +134,7 @@ export interface SuggestedApplication {
   promoted_application_id: number | null;
   created_at: string;
   filter_failures: string | null; // JSON-encoded string[] of reasons; null if it passed all enabled filters
+  verification_status: SuggestedApplicationVerificationStatus; // "confirmed" = live-verified open; "plausible" = fetch blocked but corroborated
 }
 
 export interface InternshipFilterSettings {
@@ -165,5 +169,16 @@ export interface EmailDraftChatMessage {
   role: EmailDraftChatRole;
   content: string;
   resulting_draft_id: number | null;
+  created_at: string;
+}
+
+export type ResearchProfileHistorySource = "research" | "document" | "chat" | "incorporate";
+
+export interface ResearchProfileHistoryEntry {
+  id: number;
+  category: string;
+  slug: string;
+  summary: string;
+  source: ResearchProfileHistorySource;
   created_at: string;
 }

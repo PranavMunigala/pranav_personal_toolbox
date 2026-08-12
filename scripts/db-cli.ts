@@ -22,6 +22,7 @@
  * applications contacts <applicationId>
  *
  * target-companies list
+ * target-companies add '<json {name, location?, commute_tier, notes?, careers_url?}>'
  *
  * preferences get
  * preferences set '<json {industries?, roles?, seniority_focus?, notes?}>'
@@ -33,7 +34,7 @@
  *
  * suggested-applications list [--discovered_at=YYYY-MM-DD]   # defaults to latest pending batch
  * suggested-applications list-keys                            # every company/role/link ever suggested, for dedup
- * suggested-applications add '<json NewSuggestedApplication>'
+ * suggested-applications add '<json NewSuggestedApplication>'  # verification_status: "confirmed" (default) | "plausible"
  * suggested-applications promote <id> ['<json overrides>']
  * suggested-applications dismiss <id>
  *
@@ -64,7 +65,7 @@ import {
   linkContactToApplication,
   getContactsForApplication,
 } from "../lib/db/applications";
-import { listTargetCompanies } from "../lib/db/targetCompanies";
+import { listTargetCompanies, upsertTargetCompany } from "../lib/db/targetCompanies";
 import { getPreferences, updatePreferences } from "../lib/db/preferences";
 import {
   listSuggestedContacts,
@@ -202,6 +203,14 @@ switch (`${resource} ${action}`) {
 
   case "target-companies list": {
     out(listTargetCompanies());
+    break;
+  }
+  case "target-companies add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    if (!payload.name) fail("name is required");
+    if (!payload.commute_tier) fail("commute_tier is required");
+    upsertTargetCompany(payload);
+    out(listTargetCompanies().find((c) => c.name.toLowerCase() === payload.name.toLowerCase()));
     break;
   }
 

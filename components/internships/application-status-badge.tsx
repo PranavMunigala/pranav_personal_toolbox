@@ -1,5 +1,9 @@
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationStatus, CommuteTier } from "@/lib/db/types";
+import type {
+  ApplicationStatus,
+  CommuteTier,
+  SuggestedApplicationVerificationStatus,
+} from "@/lib/db/types";
 import { cn } from "@/lib/utils";
 
 const STATUS_STYLE: Record<ApplicationStatus, string> = {
@@ -39,6 +43,22 @@ export function CommuteTierBadge({ tier }: { tier: CommuteTier }) {
   return (
     <Badge variant="secondary" className="font-normal">
       {TIER_LABEL[tier]}
+    </Badge>
+  );
+}
+
+export function VerificationStatusBadge({
+  status,
+}: {
+  status: SuggestedApplicationVerificationStatus;
+}) {
+  if (status === "confirmed") return null;
+  return (
+    <Badge
+      variant="outline"
+      className="border-0 font-medium bg-amber-500/15 text-amber-700 dark:text-amber-300"
+    >
+      Unverified — check manually
     </Badge>
   );
 }

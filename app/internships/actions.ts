@@ -171,12 +171,14 @@ export async function addTargetCompanyAction(input: {
   name: string;
   location?: string;
   commute_tier: CommuteTier;
+  careers_url?: string;
 }): Promise<ActionResult> {
   if (!input.name.trim()) return { ok: false, message: "Company name is required." };
   upsertTargetCompany({
     name: input.name.trim(),
     location: input.location || null,
     commute_tier: input.commute_tier,
+    careers_url: input.careers_url || null,
   });
   revalidatePath("/internships");
   return { ok: true, message: `${input.name} added to target companies.` };

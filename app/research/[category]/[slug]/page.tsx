@@ -5,8 +5,10 @@ import { notFound } from "next/navigation";
 import { readMarkdownDoc, getMarkdownTitle } from "@/lib/content";
 import { MarkdownView } from "@/components/markdown-view";
 import { RefreshProfileButton } from "@/components/research/refresh-profile-button";
+import { ResearchHistoryButton } from "@/components/research/research-history-button";
 import { ResearchChatSidebar } from "@/components/research/research-chat-sidebar";
 import { listChatMessages } from "@/lib/db/researchChat";
+import { listProfileHistory } from "@/lib/db/researchProfileHistory";
 import { ArrowLeft } from "lucide-react";
 
 const RESEARCH_ROOT = path.join(process.cwd(), "research");
@@ -27,6 +29,7 @@ export default async function ResearchDocPage({
     role: m.role,
     content: m.content,
   }));
+  const history = listProfileHistory(category, slug);
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10 space-y-6">
@@ -47,7 +50,10 @@ export default async function ResearchDocPage({
             day: "numeric",
           })}
         </p>
-        <RefreshProfileButton title={title} category={category} />
+        <div className="flex items-center gap-2">
+          <ResearchHistoryButton history={history} />
+          <RefreshProfileButton title={title} category={category} />
+        </div>
       </div>
 
       <MarkdownView content={content} />

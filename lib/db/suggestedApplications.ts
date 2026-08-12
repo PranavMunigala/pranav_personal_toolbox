@@ -1,6 +1,10 @@
 import { db } from "./index";
 import { findExistingApplication, insertApplication, type NewApplication } from "./applications";
-import type { Application, SuggestedApplication } from "./types";
+import type {
+  Application,
+  SuggestedApplication,
+  SuggestedApplicationVerificationStatus,
+} from "./types";
 
 export interface NewSuggestedApplication {
   company: string;
@@ -12,6 +16,7 @@ export interface NewSuggestedApplication {
   match_reasons?: string | null;
   discovered_at?: string; // defaults to today
   filter_failures?: string[] | null; // reasons it failed enabled filters; null/omitted if it passed all
+  verification_status?: SuggestedApplicationVerificationStatus; // defaults to "confirmed"
 }
 
 export function listSuggestedApplications(discoveredAt?: string): SuggestedApplication[] {
@@ -62,8 +67,8 @@ export function insertSuggestedApplication(s: NewSuggestedApplication): Suggeste
   const info = db
     .prepare(
       `INSERT INTO suggested_applications
-        (company, role, link, location, date_posted, source_snippet, match_reasons, discovered_at, filter_failures)
-       VALUES (@company, @role, @link, @location, @date_posted, @source_snippet, @match_reasons, COALESCE(@discovered_at, date('now')), @filter_failures)`
+        (company, role, link, location, date_posted, source_snippet, match_reasons, discovered_at, filter_failures, verification_status)
+       VALUES (@company, @role, @link, @location, @date_posted, @source_snippet, @match_reasons, COALESCE(@discovered_at, date('now')), @filter_failures, COALESCE(@verification_status, 'confirmed'))`
     )
     .run({
       company: s.company,
@@ -75,6 +80,7 @@ export function insertSuggestedApplication(s: NewSuggestedApplication): Suggeste
       match_reasons: s.match_reasons ?? null,
       discovered_at: s.discovered_at ?? null,
       filter_failures: s.filter_failures?.length ? JSON.stringify(s.filter_failures) : null,
+      verification_status: s.verification_status ?? null,
     });
   return getSuggestedApplication(Number(info.lastInsertRowid))!;
 }

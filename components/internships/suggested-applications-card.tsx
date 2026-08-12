@@ -16,6 +16,7 @@ import {
 } from "@/app/internships/actions";
 import type { SuggestedApplication } from "@/lib/db/types";
 import { Check, ExternalLink, X } from "lucide-react";
+import { VerificationStatusBadge } from "./application-status-badge";
 
 export function SuggestedApplicationsCard({
   suggestions,
@@ -45,6 +46,8 @@ export function SuggestedApplicationsCard({
   // Defensively hide anything with filter_failures set (e.g. legacy rows from before
   // near-misses were removed) — only fully-passing postings are ever shown.
   const fullMatches = suggestions.filter((s) => !s.filter_failures);
+  const confirmedMatches = fullMatches.filter((s) => s.verification_status === "confirmed");
+  const plausibleMatches = fullMatches.filter((s) => s.verification_status === "plausible");
 
   return (
     <Card>
@@ -61,16 +64,38 @@ export function SuggestedApplicationsCard({
             No new suggested postings yet. Use the search cards above to find some.
           </p>
         ) : (
-          <div className="space-y-3">
-            {fullMatches.map((s) => (
-              <SuggestionRow
-                key={s.id}
-                suggestion={s}
-                isPending={isPending}
-                onAdd={add}
-                onDismiss={dismiss}
-              />
-            ))}
+          <div className="space-y-4">
+            {confirmedMatches.length > 0 && (
+              <div className="space-y-3">
+                {confirmedMatches.map((s) => (
+                  <SuggestionRow
+                    key={s.id}
+                    suggestion={s}
+                    isPending={isPending}
+                    onAdd={add}
+                    onDismiss={dismiss}
+                  />
+                ))}
+              </div>
+            )}
+            {plausibleMatches.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-xs text-muted-foreground font-medium">
+                  Unverified — the posting page couldn&apos;t be directly confirmed
+                  (blocked/login-gated), but other evidence suggests it&apos;s still
+                  open. Double-check before applying.
+                </p>
+                {plausibleMatches.map((s) => (
+                  <SuggestionRow
+                    key={s.id}
+                    suggestion={s}
+                    isPending={isPending}
+                    onAdd={add}
+                    onDismiss={dismiss}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
       </CardContent>
@@ -94,6 +119,7 @@ function SuggestionRow({
       <div className="space-y-1">
         <div className="flex items-center gap-1.5 font-medium">
           {s.company} — {s.role}
+          <VerificationStatusBadge status={s.verification_status} />
           {s.link && (
             <a
               href={s.link}

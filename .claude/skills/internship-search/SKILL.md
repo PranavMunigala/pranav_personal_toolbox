@@ -21,10 +21,11 @@ into `applications`.
    npx tsx scripts/db-cli.ts suggested-applications list-keys
    ```
    Use the `industries`/`roles` from preferences and the `name`/`location` from each
-   target company. Build the "already tracked" dedup set from `applications list` (by
-   `link`, and by `company`+`role` as a fallback) AND `suggested-applications list-keys`
-   (every suggestion ever made, not just the current pending batch — so a
-   dismissed/older-batch posting never resurfaces).
+   target company. Note each target company's `careers_url` if set — see the
+   target-company search bullet below. Build the "already tracked" dedup set from
+   `applications list` (by `link`, and by `company`+`role` as a fallback) AND
+   `suggested-applications list-keys` (every suggestion ever made, not just the current
+   pending batch — so a dismissed/older-batch posting never resurfaces).
 
 2. **Search two ways with WebSearch**:
    - **Broad criteria search**: newly posted internships/co-ops in AI applied to
@@ -33,8 +34,13 @@ into `applications`.
      today/this week" signals when the source shows them). Run this as a **tiered,
      budgeted sweep** rather than searching every source every time — see "Tiered
      broad search" below.
-   - **Target-company search**: for each company in the target-companies list, search
-     specifically for current internship/entry-level postings at that company.
+   - **Target-company search**: for each company in the target-companies list, if it
+     has a `careers_url` set, fetch that URL directly first (its own job board is the
+     authoritative, freshest source, and unlike guessed generic career-page URLs it's
+     already known to work). Only fall back to a WebSearch for that company if
+     `careers_url` is absent or the fetch fails. For companies without a
+     `careers_url`, search specifically for current internship/entry-level postings at
+     that company as before.
    - Handshake is NOT searchable at all (school-login-gated, no public index) — if it
      would have been relevant, say so plainly rather than silently omitting it.
      LinkedIn results may be thin or blocked (it aggressively blocks non-browser
@@ -52,28 +58,43 @@ cost of a full sweep across every source.
   `site:github.com vanshb03 Summer Internships`,
   `site:github.com Ouckah Summer2026-Internships`, plus one general WebSearch for
   the query terms + "internship" + the current term/year. Issue all of these as one
-  batch of parallel WebSearch calls, not one-by-one with reasoning in between.
-- **Tier 2 (only if Tier 1 fell short — see stop rule)**: broader job boards —
+  batch of parallel WebSearch calls, not one-by-one with reasoning in between. Treat
+  these tracker-repo listings as leads to verify, not as evidence of current status —
+  they're known to lag real posting status (a role indexed there may already be
+  closed), so live-verification (step 6) matters more for this tier than any other.
+- **Tier 1b (always search, alongside Tier 1)**: direct-ATS-platform search —
+  `site:boards.greenhouse.io internship` + query terms,
+  `site:jobs.lever.co internship` + query terms,
+  `site:myworkdayjobs.com internship` + query terms — run generally and, for target
+  companies without a known `careers_url`, per-company (`"<Company>" site:
+  boards.greenhouse.io` etc.). These ATS platforms host the employer's actual live
+  job board with no login wall, so they're typically fetchable and are the
+  authoritative source — prefer a Tier 1b/direct-ATS result over a Tier 1
+  tracker-repo result when both surface the same role. Candidates from this tier
+  count toward the same stop-rule total as Tier 1.
+- **Tier 2 (only if Tier 1+1b fell short — see stop rule)**: broader job boards —
   ZipRecruiter, Jobright.ai, `site:linkedin.com/jobs`, `site:indeed.com`, and
   `site:wayup.com`. Also batched as parallel calls.
-- **Tier 3 (only if Tier 1+2 fell short)**: niche/biomedical-specific sources,
+- **Tier 3 (only if Tier 1+1b+2 fell short)**: niche/biomedical-specific sources,
   matching this user's actual field focus rather than generic breadth for its own
   sake — BioSpace Jobs (`site:biospace.com jobs`) and a general "biomedical
   engineering internship" / "health-tech internship" web search.
 
-**Stop rule**: after completing a tier's searches, run that tier's new candidates
+**Stop rule**: after completing a tier's searches (Tier 1 and Tier 1b count as one
+combined step since they always run together), run that tier's new candidates
 through steps 3-6 below (classify, dedup, hardcoded filter, live-verify) before
-deciding whether to escalate. If the running total of fully-verified
-(`confirmed_open`, filter-passing) candidates across all tiers searched so far is
-already ≥ the run's `max_results`, stop — do not search the next tier. Only
-escalate when still short after a tier completes. In the worst case (still short
-after Tier 3), stop anyway and surface whatever verified candidates were found —
-never keep searching indefinitely.
+deciding whether to escalate. Count both `confirmed_open` and `plausible_open`
+candidates (see step 6) toward the running total against `max_results` — stop once
+that combined total is reached, do not search the next tier. Only escalate when
+still short after a tier completes. In the worst case (still short after Tier 3),
+stop anyway and surface whatever verified/plausible candidates were found — never
+keep searching indefinitely.
 
 Steps 3-6 below run once per tier (on that tier's new candidates, plus the
-target-company search results alongside Tier 1), not once at the very end — that's
-what makes the stop rule possible. Track how many tiers of the broad search you
-actually searched (1, 2, or 3) as `tiersSearched`, needed for the final result.
+target-company search results alongside Tier 1/1b), not once at the very end —
+that's what makes the stop rule possible. Track how many tiers of the broad search
+you actually searched (1, 2, or 3 — Tier 1b doesn't add to this count, it's bundled
+with Tier 1) as `tiersSearched`, needed for the final result.
 
 3. **Classify every candidate with these structured fields** (used for filtering below —
    be honest and conservative, don't round in the candidate's favor):
@@ -104,31 +125,62 @@ actually searched (1, 2, or 3) as `tiersSearched`, needed for the final result.
    surfaced.
 
 6. **Live-verify every passed candidate's link** with WebFetch — this is a hard,
-   non-toggleable gate. For each posting's actual fetched page content, classify:
-   - **`confirmed_closed`**: content says "closed," "no longer accepting applications,"
-     "position filled"; a 404/error page; or a generic careers/search homepage instead
-     of the specific posting.
+   non-toggleable gate (the *bar for evidence* is fixed; what counts as sufficient
+   evidence is a bit richer than before, see below). For candidates whose `link`
+   domain is one of the **known-blocked sources** (`linkedin.com`, `glassdoor.com`,
+   Handshake — these systematically 403/login-wall WebFetch), skip straight to the
+   `plausible_open` corroboration check below instead of spending a fetch attempt
+   that's known to fail.
+
+   For everything else, WebFetch the link. If the fetch fails or is blocked
+   (403/access-denied/error), retry **once** with a normalized variant of the URL
+   (strip tracking query params, try `https://` if `http://` failed, drop a trailing
+   slash/redirect fragment) before giving up on a direct fetch.
+
+   Classify the result:
+   - **`confirmed_closed`**: the fetched page *explicitly* says "closed," "no longer
+     accepting applications," "position filled"; is a genuine 404; or is a generic
+     careers/search homepage instead of the specific posting. A 403/access-denied/
+     blocked response is **not** `confirmed_closed` — that's a failed fetch, not
+     evidence the role is gone; route it to the check below.
    - **`confirmed_open`**: the specific posting's content is present with a working
-     "Apply" flow described.
-   - **`unconfirmed`**: login wall, empty/JS shell with no real posting content, or you
-     genuinely can't tell either way — never guess `confirmed_open` without real
-     evidence in the fetched content.
-   Only `confirmed_open` candidates survive into the next step.
+     "Apply" flow described, from a fetch that actually succeeded (first or retried).
+   - **`plausible_open`**: the direct fetch was blocked/403'd, hit a login wall, or is
+     from a known-blocked source, **and** a fresh, separate WebSearch for that exact
+     company + role + term returns a snippet that still describes the role as
+     open/active — not stale-looking, no "closed"/"filled"/"no longer accepting"
+     language in the snippet. This is corroboration from independent evidence, not a
+     guess: if there's no such corroborating snippet, this does not apply — fall
+     through to `unconfirmed` instead.
+   - **`unconfirmed`**: no real evidence either way — empty/JS shell with no content,
+     or a blocked fetch with no corroborating search evidence either. Never guess
+     `confirmed_open` or `plausible_open` without real evidence backing it.
+
+   `confirmed_open` and `plausible_open` candidates both survive into the next step;
+   `confirmed_closed` and `unconfirmed` are discarded. Track which of the two
+   surviving classifications each candidate got — it becomes `verification_status` in
+   step 8.
 
 7. **Cap and rank**: once escalation stops (per the stop rule above), sort all
-   surviving candidates across every tier searched by `relevance_score` descending,
-   then cap at the run's requested max.
+   surviving candidates across every tier searched by `relevance_score` descending
+   (break ties in favor of `confirmed_open` over `plausible_open`), then cap at the
+   run's requested max.
 
 8. **Write each survivor via the CLI, never raw SQL**:
    ```
-   npx tsx scripts/db-cli.ts suggested-applications add '{"company": "...", "role": "...", "link": "...", "location": "...", "date_posted": "...", "source_snippet": "...", "match_reasons": "...", "filter_failures": null}'
+   npx tsx scripts/db-cli.ts suggested-applications add '{"company": "...", "role": "...", "link": "...", "location": "...", "date_posted": "...", "source_snippet": "...", "match_reasons": "...", "filter_failures": null, "verification_status": "confirmed"}'
    ```
-   `filter_failures` is always `null` — only fully-passing, live-verified postings ever
-   get written. Each call defaults `discovered_at` to today.
+   `filter_failures` is always `null` — only fully-passing, live-verified/plausible
+   postings ever get written. `verification_status` is `"confirmed"` for
+   `confirmed_open` survivors or `"plausible"` for `plausible_open` survivors (from
+   step 6) — always set it explicitly, don't rely on the default. Each call defaults
+   `discovered_at` to today.
 
 9. **Report results to the user**: what was added (grouped: target-company matches
-   first by commute tier, then broad matches). If nothing new/verified turned up, say so
-   plainly — that's a completely valid outcome, don't pad with weak or unverified
+   first by commute tier, then broad matches), and call out how many were `plausible`
+   (blocked fetch, corroborated by search) vs `confirmed` so the user knows which ones
+   are worth double-checking themselves before applying. If nothing new turned up, say
+   so plainly — that's a completely valid outcome, don't pad with weak/unconfirmed
    matches. For adding one to the real tracker, hand off to the `internship-intake`
    skill's flow (or `suggested-applications promote <id>`) rather than duplicating that
    logic here.
@@ -147,7 +199,8 @@ search (and `tiersSearched`) doesn't apply — only the target-company search ru
 only the final JSON result `{"addedCount": <candidates written>, "tiersSearched": <0-3,
 per the tiered broad search's stop rule>, "note": "<one or two sentences on how the
 search went, including any source issues like LinkedIn blocking or Handshake being
-unsearchable>"}`, no surrounding prose.
+unsearchable, and roughly how many results were plausible vs confirmed>"}`, no
+surrounding prose. `addedCount` includes both `confirmed` and `plausible` rows written.
 
 ## Constraints
 
@@ -157,6 +210,14 @@ unsearchable>"}`, no surrounding prose.
   human review.
 - Live-verification (step 6) is never skippable or toggle-controlled — the hardcoded
   filters (step 5) are the only user-configurable part, and a candidate that fails any
-  enabled filter is discarded, never surfaced for override.
+  enabled filter is discarded, never surfaced for override. The evidence bar for
+  survival is fixed (`confirmed_open` or a genuinely corroborated `plausible_open`,
+  per step 6) — it never gets softer than that, even under time pressure.
+- **Known-blocked sources** (systematically 403/login-wall WebFetch — don't spend a
+  fetch attempt on these, go straight to the step-6 corroboration check): LinkedIn,
+  Glassdoor, Handshake. If new sources turn out to reliably block fetches, treat them
+  the same way and mention it in the run's `note`/report.
 - Only extract postings actually present in the search/fetch results, with a real URL —
-  never invent a posting or rely on prior knowledge beyond what's shown.
+  never invent a posting or rely on prior knowledge beyond what's shown. This applies
+  equally to the `plausible_open` corroborating snippet — it must be real search
+  output, never inferred or assumed.

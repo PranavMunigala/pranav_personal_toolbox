@@ -7,13 +7,14 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MarkdownView } from "@/components/markdown-view";
-import { sendResearchChatMessageAction } from "@/app/research/actions";
-import { MessageCircle, X, Send } from "lucide-react";
+import { sendResearchChatMessageAction, incorporateResearchAnswerAction } from "@/app/research/actions";
+import { MessageCircle, X, Send, GitMerge } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
+  profileUpdated?: boolean;
 }
 
 export function ResearchChatSidebar({
@@ -30,6 +31,8 @@ export function ResearchChatSidebar({
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [draft, setDraft] = useState("");
   const [isPending, startTransition] = useTransition();
+  const [incorporatedIndices, setIncorporatedIndices] = useState<Set<number>>(new Set());
+  const [incorporatingIndex, setIncorporatingIndex] = useState<number | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -49,10 +52,44 @@ export function ResearchChatSidebar({
         toast.error(result.error ?? "Chat failed.");
         return;
       }
-      setMessages((prev) => [...prev, { role: "assistant", content: result.reply! }]);
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: result.reply!, profileUpdated: result.profileUpdated },
+      ]);
       if (result.profileUpdated) {
         toast.success("Profile updated with the new info.");
         router.refresh();
+      }
+    });
+  }
+
+  function incorporate(index: number) {
+    const answerMessage = messages[index];
+    const questionMessage = messages[index - 1];
+    if (!answerMessage || !questionMessage || questionMessage.role !== "user") return;
+
+    setIncorporatingIndex(index);
+    startTransition(async () => {
+      const result = await incorporateResearchAnswerAction(
+        category,
+        slug,
+        questionMessage.content,
+        answerMessage.content
+      );
+      setIncorporatingIndex(null);
+
+      if (!result.ok) {
+        toast.error(result.error ?? "Couldn't incorporate that.");
+        return;
+      }
+
+      setIncorporatedIndices((prev) => new Set(prev).add(index));
+
+      if (result.profileUpdated) {
+        toast.success(result.note ?? "Profile updated with the new info.");
+        router.refresh();
+      } else {
+        toast.info(result.note ?? "Nothing new to add — already reflected in the profile.");
       }
     });
   }
@@ -78,7 +115,7 @@ export function ResearchChatSidebar({
             </Button>
           </div>
 
-          <ScrollArea className="flex-1 px-4">
+          <ScrollArea className="flex-1 min-h-0 px-4">
             <div className="flex flex-col gap-4 py-4">
               {messages.length === 0 && (
                 <p className="text-sm text-muted-foreground">
@@ -86,23 +123,44 @@ export function ResearchChatSidebar({
                   the saved profile.
                 </p>
               )}
-              {messages.map((m, i) => (
-                <div
-                  key={i}
-                  className={cn(
-                    "rounded-lg px-3 py-2 text-sm",
-                    m.role === "user"
-                      ? "self-end bg-primary text-primary-foreground"
-                      : "self-start bg-muted"
-                  )}
-                >
-                  {m.role === "assistant" ? (
-                    <MarkdownView content={m.content} />
-                  ) : (
-                    <p className="whitespace-pre-wrap">{m.content}</p>
-                  )}
-                </div>
-              ))}
+              {messages.map((m, i) => {
+                const canIncorporate =
+                  m.role === "assistant" &&
+                  !m.profileUpdated &&
+                  !incorporatedIndices.has(i) &&
+                  messages[i - 1]?.role === "user";
+
+                return (
+                  <div key={i} className="flex flex-col gap-1.5">
+                    <div
+                      className={cn(
+                        "rounded-lg px-3 py-2 text-sm",
+                        m.role === "user"
+                          ? "self-end bg-primary text-primary-foreground"
+                          : "self-start bg-muted"
+                      )}
+                    >
+                      {m.role === "assistant" ? (
+                        <MarkdownView content={m.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap">{m.content}</p>
+                      )}
+                    </div>
+                    {canIncorporate && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="self-start"
+                        disabled={incorporatingIndex === i}
+                        onClick={() => incorporate(i)}
+                      >
+                        <GitMerge className="size-3.5" />
+                        {incorporatingIndex === i ? "Incorporating…" : "Incorporate"}
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
               {isPending && (
                 <p className="self-start text-sm text-muted-foreground">Thinking…</p>
               )}
