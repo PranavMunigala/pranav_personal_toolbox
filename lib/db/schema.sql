@@ -44,6 +44,69 @@ CREATE TABLE IF NOT EXISTS email_draft_chat_messages (
 
 CREATE INDEX IF NOT EXISTS idx_email_draft_chat_messages_contact ON email_draft_chat_messages(contact_id);
 
+-- One row per "tailor this posting" session: the fixed JD + resume snapshot that all
+-- resume_drafts and cover_letter_drafts for that session are generated against. Not
+-- editable after creation — start a new session for a materially different JD or
+-- resume version, same "versioned, never edited" philosophy as the drafts themselves.
+CREATE TABLE IF NOT EXISTS scout_sessions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  application_id INTEGER REFERENCES applications(id) ON DELETE SET NULL,
+  company TEXT NOT NULL,
+  role TEXT NOT NULL,
+  job_posting_url TEXT,
+  job_posting_text TEXT NOT NULL, -- pasted JD text, or a thin placeholder if only a URL was given (resume-tailor WebFetches lazily on first run)
+  resume_source_text TEXT NOT NULL, -- pasted resume text
+  extra_context_text TEXT, -- pasted extra projects/experience not already on the resume
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS resume_drafts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scout_session_id INTEGER NOT NULL REFERENCES scout_sessions(id) ON DELETE CASCADE,
+  tailored_resume_markdown TEXT NOT NULL,
+  gap_analysis TEXT NOT NULL, -- JSON {must_haves:[{requirement,evidence_in_resume,note}], nice_to_haves:[...]}
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Chat turns for the "refine this resume" box, scoped by scout_session_id (mirrors
+-- email_draft_chat_messages exactly). resulting_draft_id links an assistant turn to the
+-- resume_drafts row it produced, null on refusal.
+CREATE TABLE IF NOT EXISTS resume_draft_chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scout_session_id INTEGER NOT NULL REFERENCES scout_sessions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  resulting_draft_id INTEGER REFERENCES resume_drafts(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_resume_draft_chat_messages_session ON resume_draft_chat_messages(scout_session_id);
+
+CREATE TABLE IF NOT EXISTS cover_letter_drafts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scout_session_id INTEGER NOT NULL REFERENCES scout_sessions(id) ON DELETE CASCADE,
+  cover_letter_markdown TEXT NOT NULL,
+  research_sources TEXT NOT NULL DEFAULT '[]', -- JSON array of {url, note}
+  word_count INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- Chat turns for the "refine this cover letter" box, same shape/scoping as
+-- resume_draft_chat_messages above.
+CREATE TABLE IF NOT EXISTS cover_letter_chat_messages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  scout_session_id INTEGER NOT NULL REFERENCES scout_sessions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
+  content TEXT NOT NULL,
+  resulting_draft_id INTEGER REFERENCES cover_letter_drafts(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_cover_letter_chat_messages_session ON cover_letter_chat_messages(scout_session_id);
+CREATE INDEX IF NOT EXISTS idx_scout_sessions_application ON scout_sessions(application_id);
+CREATE INDEX IF NOT EXISTS idx_resume_drafts_session ON resume_drafts(scout_session_id);
+CREATE INDEX IF NOT EXISTS idx_cover_letter_drafts_session ON cover_letter_drafts(scout_session_id);
+
 CREATE TABLE IF NOT EXISTS applications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   company TEXT NOT NULL,

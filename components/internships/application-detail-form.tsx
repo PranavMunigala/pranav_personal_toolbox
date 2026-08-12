@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import { updateApplicationAction } from "@/app/internships/actions";
 import type { Application, ApplicationStatus, Contact } from "@/lib/db/types";
-import { ArrowLeft, ExternalLink } from "lucide-react";
+import { ArrowLeft, ExternalLink, Compass } from "lucide-react";
 
 const STATUS_OPTIONS: ApplicationStatus[] = [
   "applied",
@@ -82,17 +82,26 @@ export function ApplicationDetailForm({
           <ArrowLeft className="size-3.5" />
           Back to tracker
         </Link>
-        {application.link && (
-          <a
-            href={application.link}
-            target="_blank"
-            rel="noreferrer"
+        <div className="flex items-center gap-4">
+          <Link
+            href={`/scout?applicationId=${application.id}`}
             className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5"
           >
-            View posting
-            <ExternalLink className="size-3.5" />
-          </a>
-        )}
+            <Compass className="size-3.5" />
+            Scout this posting
+          </Link>
+          {application.link && (
+            <a
+              href={application.link}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5"
+            >
+              View posting
+              <ExternalLink className="size-3.5" />
+            </a>
+          )}
+        </div>
       </div>
 
       {closeConnections.length > 0 && (

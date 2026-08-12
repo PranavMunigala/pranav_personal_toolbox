@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   Table,
@@ -23,7 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { ApplicationStatusBadge } from "./application-status-badge";
 import { deleteApplicationAction, setApplicationStatusAction } from "@/app/internships/actions";
 import type { Application, ApplicationStatus, Contact } from "@/lib/db/types";
-import { MoreHorizontal, ExternalLink, Star } from "lucide-react";
+import { MoreHorizontal, ExternalLink, Star, Compass } from "lucide-react";
 
 const STATUS_OPTIONS: ApplicationStatus[] = [
   "applied",
@@ -43,6 +44,7 @@ export function ApplicationsTable({
   contactsByCompany: Record<string, Contact[]>;
   closeConnectionsByCompany: Record<string, Contact[]>;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [isPending, startTransition] = useTransition();
 
@@ -148,6 +150,10 @@ export function ApplicationsTable({
                         }
                       />
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => router.push(`/scout?applicationId=${a.id}`)}>
+                          <Compass className="size-3.5" />
+                          Scout this posting
+                        </DropdownMenuItem>
                         {STATUS_OPTIONS.filter((s) => s !== a.status).map((s) => (
                           <DropdownMenuItem key={s} onClick={() => changeStatus(a.id, s)}>
                             Mark as {s.replace("_", " ")}

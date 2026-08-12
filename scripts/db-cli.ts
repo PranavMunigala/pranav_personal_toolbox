@@ -43,6 +43,20 @@
  *
  * email-draft-chat list-for-contact <contactId>
  *
+ * scout-sessions list
+ * scout-sessions get <id>
+ * scout-sessions add '<json NewScoutSession>'
+ *
+ * resume-drafts list-for-session <scoutSessionId>
+ * resume-drafts add '<json NewResumeDraft>'
+ *
+ * resume-draft-chat list-for-session <scoutSessionId>
+ *
+ * cover-letter-drafts list-for-session <scoutSessionId>
+ * cover-letter-drafts add '<json NewCoverLetterDraft>'
+ *
+ * cover-letter-chat list-for-session <scoutSessionId>
+ *
  * discovery-preferences get
  * discovery-preferences set '<json {target_schools?, require_connection?, exclude_recruiters?, notes?}>'
  */
@@ -83,6 +97,14 @@ import {
 } from "../lib/db/suggestedApplications";
 import { listDraftsForContact, insertEmailDraft } from "../lib/db/emailDrafts";
 import { listDraftChatMessages } from "../lib/db/emailDraftChat";
+import { listScoutSessions, getScoutSession, insertScoutSession } from "../lib/db/scoutSessions";
+import { listResumeDraftsForSession, insertResumeDraft } from "../lib/db/resumeDrafts";
+import { listResumeDraftChatMessages } from "../lib/db/resumeDraftChat";
+import {
+  listCoverLetterDraftsForSession,
+  insertCoverLetterDraft,
+} from "../lib/db/coverLetterDrafts";
+import { listCoverLetterChatMessages } from "../lib/db/coverLetterChat";
 import type {
   ApplicationStatus,
   ConnectionStatus,
@@ -296,6 +318,50 @@ switch (`${resource} ${action}`) {
 
   case "email-draft-chat list-for-contact": {
     out(listDraftChatMessages(Number(args[0])));
+    break;
+  }
+
+  case "scout-sessions list": {
+    out(listScoutSessions());
+    break;
+  }
+  case "scout-sessions get": {
+    out(getScoutSession(Number(args[0])) ?? null);
+    break;
+  }
+  case "scout-sessions add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    out(insertScoutSession(payload));
+    break;
+  }
+
+  case "resume-drafts list-for-session": {
+    out(listResumeDraftsForSession(Number(args[0])));
+    break;
+  }
+  case "resume-drafts add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    out(insertResumeDraft(payload));
+    break;
+  }
+
+  case "resume-draft-chat list-for-session": {
+    out(listResumeDraftChatMessages(Number(args[0])));
+    break;
+  }
+
+  case "cover-letter-drafts list-for-session": {
+    out(listCoverLetterDraftsForSession(Number(args[0])));
+    break;
+  }
+  case "cover-letter-drafts add": {
+    const payload = JSON.parse(args[0] ?? "{}");
+    out(insertCoverLetterDraft(payload));
+    break;
+  }
+
+  case "cover-letter-chat list-for-session": {
+    out(listCoverLetterChatMessages(Number(args[0])));
     break;
   }
 

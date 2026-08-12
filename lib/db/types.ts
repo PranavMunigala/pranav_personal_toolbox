@@ -182,3 +182,70 @@ export interface ResearchProfileHistoryEntry {
   source: ResearchProfileHistorySource;
   created_at: string;
 }
+
+export interface ScoutSession {
+  id: number;
+  application_id: number | null;
+  company: string;
+  role: string;
+  job_posting_url: string | null;
+  job_posting_text: string;
+  resume_source_text: string;
+  extra_context_text: string | null;
+  created_at: string;
+}
+
+export interface GapAnalysisItem {
+  requirement: string;
+  evidence_in_resume: boolean;
+  note: string;
+}
+
+export interface GapAnalysis {
+  must_haves: GapAnalysisItem[];
+  nice_to_haves: GapAnalysisItem[];
+}
+
+export interface ResumeDraft {
+  id: number;
+  scout_session_id: number;
+  tailored_resume_markdown: string;
+  gap_analysis: string; // JSON-encoded GapAnalysis
+  created_at: string;
+}
+
+export type ResumeDraftChatRole = "user" | "assistant";
+
+export interface ResumeDraftChatMessage {
+  id: number;
+  scout_session_id: number;
+  role: ResumeDraftChatRole;
+  content: string;
+  resulting_draft_id: number | null;
+  created_at: string;
+}
+
+export interface CoverLetterResearchSource {
+  url: string;
+  note: string;
+}
+
+export interface CoverLetterDraft {
+  id: number;
+  scout_session_id: number;
+  cover_letter_markdown: string;
+  research_sources: string; // JSON-encoded CoverLetterResearchSource[]
+  word_count: number;
+  created_at: string;
+}
+
+export type CoverLetterChatRole = "user" | "assistant";
+
+export interface CoverLetterChatMessage {
+  id: number;
+  scout_session_id: number;
+  role: CoverLetterChatRole;
+  content: string;
+  resulting_draft_id: number | null;
+  created_at: string;
+}
