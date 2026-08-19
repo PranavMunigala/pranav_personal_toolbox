@@ -54,11 +54,12 @@ now go through the exact same skill instructions.
   wrappers — it decides *whether* to spend a `claude -p` invocation at all, not
   something delegated to the model. Each headless invocation costs real API money, so
   these pre-flight guards matter for cost control, not just correctness.
-- Seven skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`,
+- Eight skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`,
   `biomed-research` (each gaining an "Automated invocation" section in their SKILL.md
-  describing the headless prompt/result contract), plus a `contact-enrichment` skill
-  (there was previously no skill equivalent to `enrichContacts()`). `internship-intake`
-  and `contact-intake` remain
+  describing the headless prompt/result contract), plus `contact-enrichment` and
+  `startup-discovery` skills (there was previously no skill equivalent to
+  `enrichContacts()`, and `startup-discovery` is new — see "Skills" below).
+  `internship-intake` and `contact-intake` remain
   interactive-only — no server action shells out to them.
 
 ## Modules / routes
@@ -112,9 +113,13 @@ now go through the exact same skill instructions.
   `seniority_focus`, editable from the Cold Email Tracker UI, plus
   `last_internship_refresh_at` (shared cross-module singleton — also read by internship
   search).
-- **suggested_contacts** — candidates found by contact discovery, pending human review
-  (`status`: `pending`/`added`/`dismissed`); promoting one always goes through
-  `insertContact`, never a raw insert.
+- **suggested_contacts** — candidates found by contact discovery or startup discovery,
+  pending human review (`status`: `pending`/`added`/`dismissed`); promoting one always
+  goes through `insertContact`, never a raw insert. `startup-discovery` writes into this
+  same table (via `lib/discovery/runStartupDiscovery.ts::runStartupDiscovery()`) rather
+  than a separate one — it's company-first (searches for early-stage startups in the
+  target fields, then people at those startups, cross-checking Rutgers alumni as one
+  signal, never a filter) but the output is still a person suggestion.
 - **discovery_preferences** — single row (id=1): `target_schools`, `require_connection`
   (`any`/`connected_only`/`not_connected_only`), `exclude_recruiters`, `notes` (standing
   context), `last_discovery_run_at` — narrows/rate-limits what discovery searches for.
@@ -225,6 +230,13 @@ a second way to set `status = 'sent'` that skips it.
   never directly into `contacts`. On-demand only, no scraping/enrichment API. Invoked both
   interactively and headlessly by
   `lib/discovery/runContactDiscovery.ts::runContactDiscovery()`/`runDailyDiscovery()`.
+- `startup-discovery` — company-first counterpart to `contact-discovery`: WebSearches for
+  early-stage startups in the target fields, then for people who work at those startups,
+  cross-checking Rutgers-alumni status (`discovery-preferences.target_schools`) as one
+  signal, never a filter. Writes into the same `suggested_contacts` review queue as
+  `contact-discovery`, never directly into `contacts`. On-demand only. Invoked both
+  interactively and headlessly by
+  `lib/discovery/runStartupDiscovery.ts::runStartupDiscovery()`.
 - `contact-enrichment` — given a list of existing contact names, WebSearches each and
   fills only missing `linkedin_url`/`alma_mater`/`industry_tags` fields, never
   overwrites or creates. Invoked headlessly by

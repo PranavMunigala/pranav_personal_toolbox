@@ -10,6 +10,7 @@ import { PreferencesCard } from "@/components/cold-email/preferences-card";
 import { DiscoveryPreferencesCard } from "@/components/cold-email/discovery-preferences-card";
 import { RunDiscoveryCard } from "@/components/cold-email/run-discovery-card";
 import { DailyDiscoveryCard } from "@/components/cold-email/daily-discovery-card";
+import { RunStartupDiscoveryCard } from "@/components/cold-email/run-startup-discovery-card";
 import { EnrichContactsCard } from "@/components/cold-email/enrich-contacts-card";
 import { getDiscoveryRateLimitStatus } from "@/lib/discovery/runContactDiscovery";
 
@@ -62,8 +63,10 @@ export default async function ColdEmailPage() {
             want, run as often as you like, up to 3 results each time);
             &quot;Daily discovery&quot; is a broader general sweep off your
             preferences and existing contacts alone, limited to once a day, up to 5
-            results. Both write candidates to Suggested contacts for review — neither
-            adds anyone to your tracker automatically.
+            results; &quot;Run startup discovery&quot; works company-first — it finds
+            early-stage startups in your target fields, then people who work there, up
+            to 5 results. All three write candidates to Suggested contacts for review —
+            none add anyone to your tracker automatically.
           </p>
           <p>
             <strong className="text-foreground">3. Review suggestions</strong> — each one shows
@@ -109,6 +112,8 @@ export default async function ColdEmailPage() {
           nextAvailableLabel={discoveryRateLimit.nextAvailableLabel}
         />
       </div>
+
+      <RunStartupDiscoveryCard />
 
       <SuggestedContactsCard suggestions={suggestions} batchDate={suggestionsBatchDate} />
 

@@ -15,6 +15,7 @@ import { updatePreferences } from "@/lib/db/preferences";
 import { updateDiscoveryPreferences } from "@/lib/db/discoveryPreferences";
 import { promoteSuggestedContact, dismissSuggestedContact } from "@/lib/db/suggestedContacts";
 import { runContactDiscovery, runDailyDiscovery } from "@/lib/discovery/runContactDiscovery";
+import { runStartupDiscovery } from "@/lib/discovery/runStartupDiscovery";
 import { enrichContacts } from "@/lib/discovery/enrichContacts";
 import { draftEmailForContact } from "@/lib/email/draftEmail";
 import { refineEmailDraft } from "@/lib/email/refineEmailDraft";
@@ -188,6 +189,22 @@ export async function runDailyDiscoveryAction(): Promise<ActionResult> {
     };
   } catch (err) {
     return { ok: false, message: err instanceof Error ? err.message : "Daily discovery run failed." };
+  }
+}
+
+export async function runStartupDiscoveryAction(customQuery?: string): Promise<ActionResult> {
+  try {
+    const result = await runStartupDiscovery(customQuery);
+    revalidatePath("/cold-email");
+    if (result.added.length === 0) {
+      return { ok: true, message: result.note || "No new matches found." };
+    }
+    return {
+      ok: true,
+      message: `Found ${result.added.length} new suggested contact${result.added.length === 1 ? "" : "s"}.`,
+    };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Startup discovery run failed." };
   }
 }
 
