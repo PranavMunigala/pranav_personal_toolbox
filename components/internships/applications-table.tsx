@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/badge";
 import { ApplicationStatusBadge } from "./application-status-badge";
 import { deleteApplicationAction, setApplicationStatusAction } from "@/app/internships/actions";
 import type { Application, ApplicationStatus, Contact } from "@/lib/db/types";
+import { formatDate } from "@/lib/dates";
 import { MoreHorizontal, ExternalLink, Star, Compass } from "lucide-react";
 
 const STATUS_OPTIONS: ApplicationStatus[] = [
@@ -138,7 +139,7 @@ export function ApplicationsTable({
                       : "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {new Date(a.date_applied).toLocaleDateString()}
+                    {formatDate(a.date_applied)}
                   </TableCell>
                   <TableCell>
                     <DropdownMenu>

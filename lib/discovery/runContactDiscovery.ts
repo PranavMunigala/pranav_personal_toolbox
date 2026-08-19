@@ -4,6 +4,7 @@ import { listContacts } from "@/lib/db/contacts";
 import { listSuggestedContacts } from "@/lib/db/suggestedContacts";
 import { runSkill } from "@/lib/claudeCode/runSkill";
 import type { SuggestedContact } from "@/lib/db/types";
+import { parseSqliteUtc, formatDateTime } from "@/lib/dates";
 
 // "Specific" discovery (customQuery-driven, from the Run Contact Discovery card) can be
 // run as many times as the user likes, but returns at most 3 per run.
@@ -35,12 +36,12 @@ export interface DiscoveryRateLimitStatus {
 
 export function getDiscoveryRateLimitStatus(lastRunAt: string | null): DiscoveryRateLimitStatus {
   if (!lastRunAt) return { isRateLimited: false, nextAvailableLabel: null };
-  const lastRunMs = new Date(lastRunAt.replace(" ", "T") + "Z").getTime();
+  const lastRunMs = parseSqliteUtc(lastRunAt).getTime();
   const nextAvailableMs = lastRunMs + RUN_COOLDOWN_MS;
   if (nextAvailableMs <= Date.now()) return { isRateLimited: false, nextAvailableLabel: null };
   return {
     isRateLimited: true,
-    nextAvailableLabel: new Date(nextAvailableMs).toLocaleString(),
+    nextAvailableLabel: formatDateTime(new Date(nextAvailableMs).toISOString()),
   };
 }
 

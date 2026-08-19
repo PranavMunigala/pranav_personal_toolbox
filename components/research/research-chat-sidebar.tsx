@@ -12,6 +12,7 @@ import { MessageCircle, X, Send, GitMerge } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {
+  id?: number;
   role: "user" | "assistant";
   content: string;
   profileUpdated?: boolean;
@@ -54,7 +55,12 @@ export function ResearchChatSidebar({
       }
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: result.reply!, profileUpdated: result.profileUpdated },
+        {
+          id: result.replyMessageId,
+          role: "assistant",
+          content: result.reply!,
+          profileUpdated: result.profileUpdated,
+        },
       ]);
       if (result.profileUpdated) {
         toast.success("Profile updated with the new info.");
@@ -67,6 +73,7 @@ export function ResearchChatSidebar({
     const answerMessage = messages[index];
     const questionMessage = messages[index - 1];
     if (!answerMessage || !questionMessage || questionMessage.role !== "user") return;
+    if (answerMessage.id === undefined) return;
 
     setIncorporatingIndex(index);
     startTransition(async () => {
@@ -74,7 +81,8 @@ export function ResearchChatSidebar({
         category,
         slug,
         questionMessage.content,
-        answerMessage.content
+        answerMessage.content,
+        answerMessage.id!
       );
       setIncorporatingIndex(null);
 
@@ -89,7 +97,10 @@ export function ResearchChatSidebar({
         toast.success(result.note ?? "Profile updated with the new info.");
         router.refresh();
       } else {
-        toast.info(result.note ?? "Nothing new to add — already reflected in the profile.");
+        toast.info(
+          result.note ?? "Nothing to incorporate — this is already reflected in the profile.",
+          { duration: 10000 }
+        );
       }
     });
   }
@@ -126,6 +137,7 @@ export function ResearchChatSidebar({
               {messages.map((m, i) => {
                 const canIncorporate =
                   m.role === "assistant" &&
+                  m.id !== undefined &&
                   !m.profileUpdated &&
                   !incorporatedIndices.has(i) &&
                   messages[i - 1]?.role === "user";

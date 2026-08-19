@@ -2,6 +2,7 @@ import { getPreferences, touchInternshipRefreshTimestamp } from "@/lib/db/prefer
 import { listSuggestedApplications } from "@/lib/db/suggestedApplications";
 import { runSkill } from "@/lib/claudeCode/runSkill";
 import type { SuggestedApplication } from "@/lib/db/types";
+import { parseSqliteUtc, formatDateTime } from "@/lib/dates";
 
 // Feature 1 ("Run internship search") — on-demand casual browsing, unlimited runs/day,
 // always broad (never restricted to target companies), up to 5 fully-passing results.
@@ -36,12 +37,12 @@ export interface InternshipRateLimitStatus {
 
 export function getInternshipRateLimitStatus(lastRunAt: string | null): InternshipRateLimitStatus {
   if (!lastRunAt) return { isRateLimited: false, nextAvailableLabel: null };
-  const lastRunMs = new Date(lastRunAt.replace(" ", "T") + "Z").getTime();
+  const lastRunMs = parseSqliteUtc(lastRunAt).getTime();
   const nextAvailableMs = lastRunMs + RUN_COOLDOWN_MS;
   if (nextAvailableMs <= Date.now()) return { isRateLimited: false, nextAvailableLabel: null };
   return {
     isRateLimited: true,
-    nextAvailableLabel: new Date(nextAvailableMs).toLocaleString(),
+    nextAvailableLabel: formatDateTime(new Date(nextAvailableMs).toISOString()),
   };
 }
 

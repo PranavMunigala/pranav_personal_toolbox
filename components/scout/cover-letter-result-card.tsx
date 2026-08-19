@@ -25,6 +25,7 @@ import type {
 } from "@/lib/db/types";
 import { Copy, Sparkles, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/dates";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -133,7 +134,7 @@ export function CoverLetterResultCard({
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2">
                     <p className="text-xs text-muted-foreground">
-                      {new Date(d.created_at).toLocaleString()}
+                      {formatDateTime(d.created_at)}
                       {i === 0 ? " · latest" : ""}
                     </p>
                     <Badge variant="secondary">{d.word_count} words</Badge>

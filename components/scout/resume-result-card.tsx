@@ -16,6 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MarkdownView } from "@/components/markdown-view";
 import { tailorResumeAction, refineResumeDraftAction } from "@/app/scout/actions";
 import type { ResumeDraft, ResumeDraftChatMessage, GapAnalysis } from "@/lib/db/types";
+import { formatDateTime } from "@/lib/dates";
 import { Copy, Sparkles, Send, Check, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -101,7 +102,7 @@ export function ResumeResultCard({
               <div key={d.id} className="rounded-lg border p-3 space-y-3">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-xs text-muted-foreground">
-                    {new Date(d.created_at).toLocaleString()}
+                    {formatDateTime(d.created_at)}
                     {i === 0 ? " · latest" : ""}
                   </p>
                   <Button size="sm" variant="ghost" onClick={() => copy(d)}>

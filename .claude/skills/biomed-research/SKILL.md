@@ -263,23 +263,59 @@ is not a message from you to research anew).
 
 - **No WebSearch/WebFetch in this mode** — the tool isn't even made available
   for this invocation (see "Automated invocation — incorporate" below). Treat
-  `answer` as already-verified content. Your only job is *placement*: which
-  existing section(s) does this belong in, and how do you integrate it
-  cleanly — the same "figure out which section(s) it belongs to, weave it in
-  directly, don't tack on a separate section or an unlabeled paragraph, and
-  don't just add a passing mention" approach as Step 4c's focus/document
-  enrichment.
-- Regenerate the **entire** file content (whole-file, same merge-and-footnote
-  behavior as Step 5) and write it via `research-cli.ts write` — same
-  single-write pattern as Step 8's save path, just with no research phase in
-  front of it.
+  `answer` as already-verified content.
+- **First, classify the `question`/`answer` pair** as one of two kinds, before
+  deciding placement:
+  - **Rewrite/clarification** — the question is asking to re-explain,
+    simplify, rephrase, clarify, or otherwise restate something the file
+    already covers (signals: language like "simpler", "explain again", "in
+    plain terms", "rephrase", "clarify, or "say that differently", or the
+    `answer` is substantially restating a fact/explanation already present
+    rather than introducing new information).
+  - **New information** — the `answer` introduces a fact, detail, or update
+    not already reflected in the file, including one that supersedes an
+    existing fact (e.g. a newer funding number or date).
+- **If it's a rewrite/clarification**: find the existing passage the answer is
+  re-explaining and **replace that prose in place** with the clearer version
+  (adjust surrounding sentences as needed so it still reads naturally). Don't
+  leave the original explanation sitting alongside the new one — the point is
+  a swap, not an addition. Don't add a footnote for a pure rewording;
+  footnotes are reserved for facts that changed (Step 5), not phrasing
+  changes.
+- **If it's new information**: your job is *placement* — which existing
+  section(s) does this belong in, and how do you integrate it cleanly — the
+  same "figure out which section(s) it belongs to, weave it in directly,
+  don't tack on a separate section or an unlabeled paragraph, and don't just
+  add a passing mention" approach as Step 4c's focus/document enrichment. If
+  it conflicts with or supersedes an existing fact (e.g. it's more recent),
+  follow Step 5's update convention — update inline and attach a dated
+  footnote — rather than appending a second, contradictory statement next to
+  the old one.
+- Regenerate the **entire** file content (whole-file write, reflecting
+  whichever of the two behaviors above applies) and write it via
+  `research-cli.ts write` — same single-write pattern as Step 8's save path,
+  just with no research phase in front of it.
 - Always re-read the *current* on-disk content (via `check-exists` +
   incorporating what's already there, same as any update run) before
-  deciding what to add. If the fact is already reflected in the file, don't
-  duplicate it — this makes clicking Incorporate twice on the same answer
-  safe by construction.
+  deciding what to change. **The "don't duplicate it" idempotency check is
+  intent-specific — don't apply one rule to both kinds:**
+  - For a **rewrite/clarification**: the underlying fact being "already in
+    the file" is NOT a reason to skip — that's true of every rewrite by
+    definition, since you're re-explaining something that already exists.
+    Only skip (`profileUpdated: false`) if the file's *current wording* for
+    that passage is already essentially identical to the answer — i.e.
+    incorporating it again would swap in text that's already there,
+    word-for-word or near enough. A genuine rewrite/clarification Incorporate
+    click should almost always produce `profileUpdated: true` the *first*
+    time it's clicked on a given answer, since the wording you're placing is
+    by construction different from what's currently in the file. This is
+    what makes clicking Incorporate twice on the *same* answer safe (the
+    second click sees its own already-swapped-in wording and skips) without
+    also making the *first* click a no-op.
+  - For **new information**: skip only if that specific fact/detail is
+    already present anywhere in the file — the original rule, unchanged.
 - Return only structured JSON, no surrounding prose:
-  `{"profileUpdated": <bool>, "note": "<short note on which section(s) it was woven into, or why nothing changed>"}`.
+  `{"profileUpdated": <bool>, "note": "<short note saying whether this was a replacement (and of what) or an addition (and where), or why nothing changed>"}`.
 
 ## Automated invocation
 

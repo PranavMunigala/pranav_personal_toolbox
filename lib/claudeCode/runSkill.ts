@@ -64,7 +64,7 @@ export async function runSkill<T>(opts: RunSkillOptions): Promise<T> {
     "--no-session-persistence",
     "--strict-mcp-config",
     "--permission-mode",
-    "manual",
+    "dontAsk",
   ];
 
   const { stdout, stderr, exitCode } = await spawnWithTimeout(args, opts.timeoutMs);
@@ -106,6 +106,7 @@ function spawnWithTimeout(
 ): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
   return new Promise((resolve, reject) => {
     const child = spawn(CLAUDE_BIN, args, { cwd: PROJECT_ROOT });
+    child.stdin.end();
 
     let stdout = "";
     let stderr = "";
@@ -128,6 +129,9 @@ function spawnWithTimeout(
     child.on("close", (exitCode) => {
       clearTimeout(killTimer);
       if (timedOut) {
+        console.error(
+          `claude -p timed out after ${timeoutMs}ms. stdout: ${stdout.slice(-500)} stderr: ${stderr.slice(-500)}`
+        );
         reject(new Error(`claude -p timed out after ${timeoutMs}ms`));
         return;
       }

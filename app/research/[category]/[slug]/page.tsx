@@ -26,8 +26,10 @@ export default async function ResearchDocPage({
   const title = getMarkdownTitle(content);
   const lastModified = fs.statSync(filePath).mtime;
   const chatMessages = listChatMessages(category, slug).map((m) => ({
+    id: m.id,
     role: m.role,
     content: m.content,
+    profileUpdated: !!m.profile_updated,
   }));
   const history = listProfileHistory(category, slug);
 

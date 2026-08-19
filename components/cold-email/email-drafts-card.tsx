@@ -17,6 +17,7 @@ import { draftEmailAction, refineEmailDraftAction } from "@/app/cold-email/actio
 import type { EmailDraft, EmailDraftChatMessage } from "@/lib/db/types";
 import { Copy, Sparkles, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { formatDateTime } from "@/lib/dates";
 
 interface ChatTurn {
   role: "user" | "assistant";
@@ -102,7 +103,7 @@ export function EmailDraftsCard({
                   <div>
                     {d.subject && <p className="font-medium text-sm">{d.subject}</p>}
                     <p className="text-xs text-muted-foreground">
-                      {new Date(d.created_at).toLocaleString()} · {d.seniority_tier_used} tier
+                      {formatDateTime(d.created_at)} · {d.seniority_tier_used} tier
                     </p>
                   </div>
                   <Button size="sm" variant="ghost" onClick={() => copy(d)}>

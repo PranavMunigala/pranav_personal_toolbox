@@ -11,7 +11,7 @@ import {
 } from "@/lib/research/runResearch";
 import { runResearchChat, incorporateResearchAnswer } from "@/lib/research/runResearchChat";
 import { readMarkdownDoc } from "@/lib/content";
-import { listChatMessages, addChatMessage } from "@/lib/db/researchChat";
+import { listChatMessages, addChatMessage, markChatMessageProfileUpdated } from "@/lib/db/researchChat";
 import { addProfileHistoryEntry } from "@/lib/db/researchProfileHistory";
 
 export interface ActionResult {
@@ -118,6 +118,7 @@ const RESEARCH_ROOT = path.join(process.cwd(), "research");
 export interface SendResearchChatMessageResult {
   ok: boolean;
   reply?: string;
+  replyMessageId?: number;
   profileUpdated?: boolean;
   error?: string;
 }
@@ -149,7 +150,13 @@ export async function sendResearchChatMessageAction(
   try {
     const result = await runResearchChat(category, slug, profileContent, history, message.trim());
 
-    addChatMessage(category, slug, "assistant", result.reply);
+    const assistantMessage = addChatMessage(
+      category,
+      slug,
+      "assistant",
+      result.reply,
+      result.profileUpdated
+    );
 
     if (result.profileUpdated) {
       addProfileHistoryEntry(category, slug, result.note ?? "Updated via chat.", "chat");
@@ -157,8 +164,14 @@ export async function sendResearchChatMessageAction(
       revalidatePath("/research");
     }
 
-    return { ok: true, reply: result.reply, profileUpdated: result.profileUpdated };
+    return {
+      ok: true,
+      reply: result.reply,
+      replyMessageId: assistantMessage.id,
+      profileUpdated: result.profileUpdated,
+    };
   } catch (err) {
+    console.error(`[research-chat] ${category}/${slug} failed:`, err);
     const message = err instanceof Error ? err.message : "Chat failed.";
     if (message.includes("timed out")) {
       return {
@@ -182,7 +195,8 @@ export async function incorporateResearchAnswerAction(
   category: string,
   slug: string,
   question: string,
-  answer: string
+  answer: string,
+  messageId: number
 ): Promise<IncorporateResearchAnswerResult> {
   const filePath = path.join(RESEARCH_ROOT, category, `${slug}.md`);
   const profileContent = readMarkdownDoc(filePath);
@@ -194,6 +208,7 @@ export async function incorporateResearchAnswerAction(
     const result = await incorporateResearchAnswer(category, slug, profileContent, question, answer);
 
     if (result.profileUpdated) {
+      markChatMessageProfileUpdated(messageId);
       addProfileHistoryEntry(category, slug, result.note, "incorporate");
       revalidatePath(`/research/${category}/${slug}`);
       revalidatePath("/research");
@@ -201,6 +216,7 @@ export async function incorporateResearchAnswerAction(
 
     return { ok: true, profileUpdated: result.profileUpdated, note: result.note };
   } catch (err) {
+    console.error(`[research-incorporate] ${category}/${slug} failed:`, err);
     const message = err instanceof Error ? err.message : "Incorporate failed.";
     if (message.includes("timed out")) {
       return {

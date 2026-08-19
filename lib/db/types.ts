@@ -158,6 +158,7 @@ export interface ResearchChatMessage {
   slug: string;
   role: ResearchChatRole;
   content: string;
+  profile_updated: number;
   created_at: string;
 }
 

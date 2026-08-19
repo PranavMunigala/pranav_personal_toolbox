@@ -61,6 +61,10 @@ const TARGET_COMPANIES_NEW_COLUMNS: Record<string, string> = {
   careers_url: "TEXT", // known-good direct ATS/job-board link, used by internship-search to fetch directly
 };
 
+const RESEARCH_CHAT_MESSAGES_NEW_COLUMNS: Record<string, string> = {
+  profile_updated: "INTEGER NOT NULL DEFAULT 0", // whether this message resulted in a profile write (chat save or Incorporate)
+};
+
 function createConnection(): Database.Database {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   const db = new Database(DB_PATH);
@@ -74,6 +78,7 @@ function createConnection(): Database.Database {
   addMissingColumns(db, "preferences", PREFERENCES_NEW_COLUMNS);
   addMissingColumns(db, "suggested_applications", SUGGESTED_APPLICATIONS_NEW_COLUMNS);
   addMissingColumns(db, "target_companies", TARGET_COMPANIES_NEW_COLUMNS);
+  addMissingColumns(db, "research_chat_messages", RESEARCH_CHAT_MESSAGES_NEW_COLUMNS);
   return db;
 }
 

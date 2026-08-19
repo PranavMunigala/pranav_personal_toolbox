@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import type { ResearchProfileHistoryEntry, ResearchProfileHistorySource } from "@/lib/db/types";
+import { formatDateTime } from "@/lib/dates";
 import { History } from "lucide-react";
 
 const SOURCE_LABEL: Record<ResearchProfileHistorySource, string> = {
@@ -52,10 +53,7 @@ export function ResearchHistoryButton({
                     {SOURCE_LABEL[h.source]}
                   </Badge>
                   <span className="text-xs text-muted-foreground shrink-0">
-                    {new Date(h.created_at).toLocaleString(undefined, {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
+                    {formatDateTime(h.created_at)}
                   </span>
                 </div>
                 <p className="text-sm">{h.summary}</p>
