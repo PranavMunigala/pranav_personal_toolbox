@@ -17,6 +17,7 @@ import { promoteSuggestedContact, dismissSuggestedContact } from "@/lib/db/sugge
 import { runContactDiscovery, runDailyDiscovery } from "@/lib/discovery/runContactDiscovery";
 import { runStartupDiscovery } from "@/lib/discovery/runStartupDiscovery";
 import { enrichContacts } from "@/lib/discovery/enrichContacts";
+import { quickAddContactFromLinkedIn } from "@/lib/discovery/quickAddContactFromLinkedIn";
 import { draftEmailForContact } from "@/lib/email/draftEmail";
 import { refineEmailDraft } from "@/lib/email/refineEmailDraft";
 import { listDraftsForContact, insertEmailDraft } from "@/lib/db/emailDrafts";
@@ -229,6 +230,22 @@ export async function promoteSuggestedContactAction(id: number): Promise<ActionR
       ? `${result.contact.name} added to the tracker — draft ready.`
       : `${result.contact.name} added to the tracker.`,
   };
+}
+
+export async function quickAddContactFromLinkedInAction(url: string): Promise<ActionResult> {
+  try {
+    const result = await quickAddContactFromLinkedIn(url.trim());
+    revalidatePath("/cold-email");
+    revalidatePath(`/cold-email/${result.contact.id}`);
+    return {
+      ok: true,
+      message: result.draftReady
+        ? `${result.contact.name} added to the tracker — draft ready.`
+        : `${result.contact.name} added to the tracker.`,
+    };
+  } catch (err) {
+    return { ok: false, message: err instanceof Error ? err.message : "Couldn't add this contact." };
+  }
 }
 
 export async function dismissSuggestedContactAction(id: number): Promise<ActionResult> {

@@ -12,6 +12,7 @@ import { RunDiscoveryCard } from "@/components/cold-email/run-discovery-card";
 import { DailyDiscoveryCard } from "@/components/cold-email/daily-discovery-card";
 import { RunStartupDiscoveryCard } from "@/components/cold-email/run-startup-discovery-card";
 import { EnrichContactsCard } from "@/components/cold-email/enrich-contacts-card";
+import { QuickAddLinkedInCard } from "@/components/cold-email/quick-add-linkedin-card";
 import { getDiscoveryRateLimitStatus } from "@/lib/discovery/runContactDiscovery";
 
 export const dynamic = "force-dynamic";
@@ -75,6 +76,12 @@ export default async function ColdEmailPage() {
             and automatically drafts an outreach email for them; Dismiss discards them.
           </p>
           <p>
+            <strong className="text-foreground">Found someone yourself?</strong> Skip
+            discovery — paste their LinkedIn URL into &quot;Add from LinkedIn URL&quot;
+            below and it searches the web for enough public info to add them straight
+            to your tracker and draft an email, no pasted profile text required.
+          </p>
+          <p>
             <strong className="text-foreground">4. Track outreach</strong> — the table below
             lists every contact and its status (contacts sitting in &quot;sent&quot; for 30+
             days with no reply automatically move to &quot;no response&quot; and are hidden
@@ -117,7 +124,10 @@ export default async function ColdEmailPage() {
 
       <SuggestedContactsCard suggestions={suggestions} batchDate={suggestionsBatchDate} />
 
-      <EnrichContactsCard />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <QuickAddLinkedInCard />
+        <EnrichContactsCard />
+      </div>
 
       <ContactTable contacts={allContacts} />
     </div>

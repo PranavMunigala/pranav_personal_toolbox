@@ -54,13 +54,13 @@ now go through the exact same skill instructions.
   wrappers — it decides *whether* to spend a `claude -p` invocation at all, not
   something delegated to the model. Each headless invocation costs real API money, so
   these pre-flight guards matter for cost control, not just correctness.
-- Eight skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`,
+- Nine skills participate: `cold-email-draft`, `contact-discovery`, `internship-search`,
   `biomed-research` (each gaining an "Automated invocation" section in their SKILL.md
-  describing the headless prompt/result contract), plus `contact-enrichment` and
-  `startup-discovery` skills (there was previously no skill equivalent to
-  `enrichContacts()`, and `startup-discovery` is new — see "Skills" below).
-  `internship-intake` and `contact-intake` remain
-  interactive-only — no server action shells out to them.
+  describing the headless prompt/result contract), plus `contact-enrichment`,
+  `startup-discovery`, and `linkedin-quick-add` skills (there was previously no skill
+  equivalent to `enrichContacts()`, and `startup-discovery`/`linkedin-quick-add` are
+  newer additions — see "Skills" below). `internship-intake` and `contact-intake`
+  remain interactive-only — no server action shells out to them.
 
 ## Modules / routes
 
@@ -241,6 +241,13 @@ a second way to set `status = 'sent'` that skips it.
   fills only missing `linkedin_url`/`alma_mater`/`industry_tags` fields, never
   overwrites or creates. Invoked headlessly by
   `lib/discovery/enrichContacts.ts::enrichContacts()`.
+- `linkedin-quick-add` — given just a LinkedIn URL (found through the user's own manual
+  search, not automated discovery), WebSearches for enough public info to create a
+  `contacts` row directly — no pasted profile text required, unlike `contact-intake`.
+  Creates the contact only; the caller then chains into `cold-email-draft` for the
+  draft, same split as `promoteSuggestedContactAction`. Invoked both interactively and
+  headlessly by
+  `lib/discovery/quickAddContactFromLinkedIn.ts::quickAddContactFromLinkedIn()`.
 - `biomed-research` — lives natively at `.claude/skills/biomed-research/` (no longer a
   submodule — `bme-research` was folded into this repo's own history). Writes profiles
   under `research/{companies,products,topics}/` at the project root via
