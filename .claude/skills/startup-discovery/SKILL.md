@@ -46,6 +46,16 @@ card on `/cold-email`, or via `suggested-contacts promote` below.
    hires), and public LinkedIn snippets. Same constraint as `contact-discovery`: rely
    on public web-search snippets only, never fetch or log into LinkedIn directly, never
    scrape a page that requires authentication.
+   - Prioritize people who look like they've been there a while (not someone just
+     announced as a brand-new hire) and whose title/role lines up with
+     `preferences.roles` — i.e. an individual contributor doing the kind of work the
+     user actually wants to do, not leadership. These people are far more likely to
+     reply to a cold student email than a founder or exec is.
+   - Only surface a founder/CEO/other C-suite person if the startup looks like it has
+     well under ~20 employees (team-page headcount, "small founding team" language, or
+     an explicit headcount in search results) — at that size the founder may still be
+     the only reasonable point of contact. At any startup that looks larger than that,
+     skip founders/C-suite entirely in favor of tenured ICs.
    - Alongside the general people-search for each startup, also run one targeted
      search for Rutgers alumni there if `target_schools` includes it (e.g. `"Rutgers"
      "<Startup Name>" LinkedIn`). This is a cross-check signal to fold into
@@ -60,17 +70,26 @@ card on `/cold-email`, or via `suggested-contacts promote` below.
    - Drop anyone already in the dedup set from step 1.
    - If `exclude_recruiters` is set, skip anyone whose title clearly reads as a
      recruiting/talent-acquisition role.
+   - Drop founder/CEO/other C-suite candidates unless the company looks like under
+     ~20 employees (per step 3's headcount guidance).
+   - Drop anyone whose search snippet reveals a LinkedIn follower count over 10,000 —
+     very popular/prominent profiles are unlikely to respond to cold student outreach.
+     If follower count isn't visible in the snippet, don't guess it — just proceed
+     normally without this filter for that person.
    - Only keep people with enough real information (name + at least company or title)
      to be useful — don't invent missing fields.
 
 5. **Cap at 5 new suggestions per run**, spread across the startups searched rather
    than all from one company if avoidable. For each, write a short, honest
-   `match_reasons` string naming the startup and why it's a fit (e.g. "Early-stage
-   computational biology startup (Series A, ~15 people); title matches target role
-   'ML Engineer'; Rutgers alum" or, when no Rutgers signal applies, "Early-stage
-   medical device startup; bio mentions biomedical engineering background" — never pad
-   in a Rutgers mention that wasn't actually confirmed) and `source_snippet` with
-   whatever text the search actually surfaced.
+   `match_reasons` string naming the startup and why it's a fit, favoring tenure/role
+   framing (e.g. "~1.5 years as a Research Associate there; title matches target role
+   'ML Engineer'; Rutgers alum" or, when no Rutgers signal applies, "~2 years as a lab
+   engineer at this early-stage medical device startup; bio mentions biomedical
+   engineering background" — never pad in a Rutgers mention that wasn't actually
+   confirmed). For the rare founder/CEO suggestion at a sub-20-person startup, say so
+   plainly (e.g. "Co-founder at this ~8-person seed-stage startup — small enough that
+   the founder is still the right contact"). Include `source_snippet` with whatever
+   text the search actually surfaced.
 
 6. **Write each suggestion via the CLI, never raw SQL** — same table and call shape as
    `contact-discovery`:
@@ -106,6 +125,10 @@ how it went>"}`, no surrounding prose.
 - Rutgers-alumni status is a cross-check signal only, never a filter — a strong
   candidate at a strong-fit startup is still worth suggesting with no Rutgers
   connection at all.
+- Prefer tenured ICs in a role matching `preferences.roles` over founders/executives —
+  founders/CEOs/C-suite are only suggestable at startups that look like under ~20
+  employees. Never suggest anyone whose search snippet shows over 10,000 LinkedIn
+  followers.
 - Don't invent a startup that didn't actually turn up in search results, and don't
   invent a person's role/background beyond what a search result actually shows.
 - On-demand only — run whenever the user asks. There is no cron/scheduled invocation
